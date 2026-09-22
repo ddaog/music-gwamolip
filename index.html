@@ -13,72 +13,60 @@
   <body>
     <div class="page-shell">
       <header class="site-header">
-        <a class="brand" href="#top" aria-label="formyiru 홈">
+        <a class="brand" href="#top" aria-label="formyiru">
           <span class="brand-mark" aria-hidden="true">
             <i></i><i></i><i></i>
           </span>
           <span>formyiru</span>
         </a>
-        <div class="project-meta">
-          <span>playground 001</span>
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="engine-label">sound asleep</span>
-        </div>
+        <div class="project-meta"><span class="status-dot" aria-hidden="true"></span><span id="engine-label">sound asleep</span></div>
       </header>
 
       <main id="top">
         <section class="hero-grid" aria-labelledby="page-title">
           <div class="copy-panel">
-            <p class="eyebrow"><span>01</span> words become waves</p>
-            <h1 id="page-title">문장의<br /><em>파장</em></h1>
-            <p class="intro">
-              한글이나 영어 문장을 적으면 단어마다 다른 빛과 질감이 피어나고,
-              온도와 움직임은 곧바로 전자음악 풍경으로 번역됩니다.
-            </p>
+            <h1 id="page-title" class="visually-hidden">문장의 파장</h1>
 
             <div class="composer" aria-label="문장 음악 만들기">
-              <label for="sentence">오늘의 한 문장</label>
+              <label class="visually-hidden" for="sentence">문장 입력</label>
               <div class="text-field-wrap">
                 <div id="sentence-highlight" class="sentence-highlight" aria-hidden="true"></div>
+                <svg id="relation-lines" class="relation-lines" aria-hidden="true"></svg>
                 <textarea
                   id="sentence"
                   maxlength="180"
-                  rows="4"
+                  rows="3"
                   spellcheck="false"
                   aria-describedby="sentence-help"
                 >비가 그친 뒤, 작은 빛이 천천히 숲을 건넌다.</textarea>
                 <span class="char-count"><b id="char-count">28</b>/180</span>
               </div>
-              <p id="sentence-help" class="field-help">
-                문장을 누르거나 입력하면 소리가 깨어나요. 문장은 기기에만 머뭅니다.
-              </p>
+              <p id="sentence-help" class="visually-hidden">문장을 입력하면 음악이 재생됩니다.</p>
 
               <div class="prompt-row" aria-label="예시 문장">
-                <button type="button" class="prompt-chip" data-prompt="달빛 아래 고요한 파도가 숨을 쉰다.">달빛과 파도</button>
-                <button type="button" class="prompt-chip" data-prompt="A tiny red bird dances through the warm wind.">a warm bird</button>
+                <button type="button" class="prompt-chip" data-prompt="달빛 아래 고요한 파도가 숨을 쉰다.">달빛 파도</button>
+                <button type="button" class="prompt-chip" data-prompt="A tiny red bird dances through the warm wind.">warm bird</button>
                 <button type="button" class="prompt-chip" data-prompt="도시는 빠르게 반짝이고, 나는 천천히 걷는다.">도시의 속도</button>
               </div>
 
               <div class="action-row">
                 <button id="play-button" class="primary-action" type="button">
                   <span class="play-icon" aria-hidden="true"></span>
-                  <span class="action-label">문장을 연주하기</span>
+                  <span class="action-label">재생</span>
                 </button>
                 <button id="variation-button" class="secondary-action" type="button">
-                  <span aria-hidden="true">↝</span> 다른 우연
+                  <span aria-hidden="true">↝</span> 변주
                 </button>
               </div>
-              <p class="status-line" id="status-line" aria-live="polite">문장을 눌러 소리를 깨우고, 고치며 함께 들어보세요.</p>
-              <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog">
-                <span aria-hidden="true">↗</span> 문장에서 발견한 것
-              </button>
+              <p class="status-line" id="status-line" aria-live="polite"> </p>
+              <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog" aria-label="문장 분석 보기">⌁</button>
             </div>
           </div>
 
           <div class="visual-panel" aria-label="문장과 음악의 움직이는 시각화">
             <div class="visual-heading">
               <div>
-                <span>live translation</span>
+                  <span class="visually-hidden">live translation</span>
                 <strong id="visual-title">비 · 빛 · 숲</strong>
               </div>
               <div class="cycle-readout">
@@ -173,10 +161,7 @@
         </dialog>
       </main>
 
-      <footer>
-        <p>우연의 아름다움 · 시행착오의 힘 · 재미의 가능성</p>
-        <p>formyiru © 2026</p>
-      </footer>
+      <footer><p>formyiru</p><p>© 2026</p></footer>
     </div>
 
     <script type="module" src="/src/main.js"></script>

@@ -7,6 +7,7 @@ import { Visualizer, visualProfileFor, visualProfileForToken } from './visualize
 const elements = {
   sentence: document.querySelector('#sentence'),
   sentenceHighlight: document.querySelector('#sentence-highlight'),
+  relationLines: document.querySelector('#relation-lines'),
   charCount: document.querySelector('#char-count'),
   playButton: document.querySelector('#play-button'),
   actionLabel: document.querySelector('.action-label'),
@@ -43,6 +44,7 @@ const elements = {
 const engine = new MusicEngine();
 let variation = 0;
 let analysis = analyzeText(elements.sentence.value, variation);
+analysis.syntax = syntaxSummary(elements.sentence.value);
 let code = createStrudelCode(analysis);
 const visualizer = new Visualizer(elements.canvas, analysis);
 let updateTimer;
@@ -102,6 +104,13 @@ function renderWordHighlight() {
   host.replaceChildren();
   let cursor = 0;
   let tokenIndex = 0;
+  const wordNodes = [];
+  const rawWords = [];
+  elements.sentence.style.height = 'auto';
+  const fieldHeight = Math.min(360, Math.max(156, elements.sentence.scrollHeight));
+  elements.sentence.style.height = `${fieldHeight}px`;
+  elements.sentence.parentElement.style.height = `${fieldHeight}px`;
+  elements.sentence.style.overflowY = elements.sentence.scrollHeight > 360 ? 'auto' : 'hidden';
   for (const match of text.matchAll(tokenRegex)) {
     const start = match.index;
     if (start > cursor) host.append(document.createTextNode(text.slice(cursor, start)));
@@ -113,6 +122,9 @@ function renderWordHighlight() {
     word.dataset.effect = profile.effect;
     word.dataset.layer = meaning?.layer ?? 'near';
     word.dataset.token = meaning.token;
+    const role = grammaticalRole(rawToken, tokenIndex, text);
+    word.dataset.role = role;
+    word.dataset.roleLabel = ({ subject: '주어', predicate: '서술', object: '목적', adjective: '형용', adverb: '부사', word: '단어' })[role];
     word.style.setProperty('--word-color', profile.color);
     word.style.setProperty('--word-accent', profile.accent);
     word.style.setProperty('--word-glow', `${Math.round(5 + ((meaning.traits.light ?? 0) + 0.4) * 18)}px`);
@@ -120,16 +132,72 @@ function renderWordHighlight() {
     word.style.setProperty('--word-delay', `${-(tokenIndex % 7) * 0.23}s`);
     word.textContent = match[0];
     host.append(word);
+    wordNodes.push(word);
+    rawWords.push(rawToken);
     cursor = start + match[0].length;
     tokenIndex += 1;
   }
   if (cursor < text.length) host.append(document.createTextNode(text.slice(cursor)));
   if (!text) host.append(document.createTextNode(' '));
+  requestAnimationFrame(() => renderRelations(wordNodes));
+}
+
+function grammaticalRole(word, index, text) {
+  const words = [...text.toLowerCase().matchAll(/[가-힣a-z0-9]+/giu)].map((match) => match[0]);
+  const englishVerbs = new Set(['is', 'are', 'was', 'were', 'be', 'am', 'seem', 'feel', 'become', 'flow', 'flows', 'move', 'moves', 'dance', 'dances', 'shine', 'shines', 'walk', 'walks', 'run', 'runs', 'sing', 'sings', 'breathe', 'breathes', 'fall', 'falls', 'rise', 'rises', 'glow', 'glows', 'drift', 'drifts', 'touch', 'touches', 'hold', 'holds', 'open', 'opens', 'close', 'closes']);
+  const predicates = words.map((item, at) => ({ item, at })).filter(({ item }) => /(?:다|는다|ㄴ다|했다|한다|흐른다|피어난다|어|아|고|면|네|죠)$/u.test(item) || englishVerbs.has(item) || /(?:ing|ed)$/u.test(item));
+  const predicate = predicates.at(-1)?.at ?? -1;
+  if (index === predicate) return 'predicate';
+  if (/(?:ly)$/u.test(word) || /(?:게|히)$/u.test(word) || ['very', 'so', 'quite', 'slowly', 'softly', 'quickly', 'gently'].includes(word)) return 'adverb';
+  if (/^(?:작은|큰|고요한|따뜻한|차가운|붉은|푸른|밝은|어두운|깊은|높은|느린|빠른|warm|cold|tiny|small|big|little|quiet|bright|dark|soft|gentle|red|blue|green|golden)$/u.test(word) || /(?:ful|ous|ive|able|less|ish)$/u.test(word)) return 'adjective';
+  if (/(?:을|를)$/u.test(word) || (predicate >= 0 && index > predicate)) return 'object';
+  if (predicate >= 0 && index < predicate) return 'subject';
+  return 'word';
+}
+
+function syntaxSummary(text) {
+  const words = [...text.toLowerCase().matchAll(/[가-힣a-z0-9]+/giu)].map((match) => match[0]);
+  return words.reduce((roles, word, index) => {
+    roles[grammaticalRole(word, index, text)] += 1;
+    return roles;
+  }, { subject: 0, predicate: 0, object: 0, adjective: 0, adverb: 0, word: 0 });
+}
+
+function renderRelations(wordNodes) {
+  const svg = elements.relationLines;
+  const rect = elements.sentenceHighlight.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  svg.replaceChildren();
+  if (wordNodes.length < 2) return;
+  const roles = wordNodes.map((node) => node.dataset.role);
+  const predicate = roles.lastIndexOf('predicate');
+  if (predicate < 0) return;
+  const sources = [];
+  const subject = roles.indexOf('subject');
+  const object = roles.indexOf('object');
+  const modifier = roles.findIndex((role) => role === 'adjective' || role === 'adverb');
+  if (subject >= 0 && subject !== predicate) sources.push([subject, predicate, '주어·서술어']);
+  if (object >= 0 && object !== predicate) sources.push([object, predicate, '목적어·서술어']);
+  if (modifier >= 0) sources.push([modifier, Math.min(modifier + 1, wordNodes.length - 1), roles[modifier] === 'adverb' ? '수식' : '꾸밈']);
+  for (const [from, to, label] of sources) {
+    const a = wordNodes[from].getBoundingClientRect();
+    const b = wordNodes[to].getBoundingClientRect();
+    const x1 = a.left + a.width / 2 - rect.left;
+    const x2 = b.left + b.width / 2 - rect.left;
+    const y1 = a.top - rect.top + 1;
+    const y2 = b.top - rect.top + 1;
+    const lift = Math.max(12, Math.min(y1, y2) - 8);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${lift} ${x2} ${y2}`);
+    path.setAttribute('class', 'relation-path');
+    svg.append(path);
+  }
 }
 
 function analyzeCurrentText({ keepVariation = false } = {}) {
   if (!keepVariation) variation = 0;
   analysis = analyzeText(elements.sentence.value, variation);
+  analysis.syntax = syntaxSummary(elements.sentence.value);
   code = createStrudelCode(analysis);
   renderAnalysis();
 }
@@ -207,14 +275,14 @@ elements.sentence.addEventListener('focus', () => {
   if (autoPlayEnabled && !engine.playing && !audioTask) playCurrent();
 });
 
-elements.sentence.addEventListener('input', () => {
+  elements.sentence.addEventListener('input', () => {
   elements.charCount.textContent = elements.sentence.value.length;
   analyzeCurrentText();
   if (autoPlayEnabled && !engine.playing && !audioTask) playCurrent();
   window.clearTimeout(updateTimer);
   updateTimer = window.setTimeout(() => {
     if (autoPlayEnabled) applyLatestAudio();
-  }, 140);
+  }, 560);
 });
 
 elements.sentence.addEventListener('keydown', (event) => {
@@ -258,6 +326,10 @@ elements.copyCode.addEventListener('click', async () => {
 window.addEventListener('formyiru:cycle', (event) => {
   elements.cycleValue.textContent = event.detail.toFixed(2).padStart(5, '0');
 });
+
+window.addEventListener('resize', () => requestAnimationFrame(() => renderRelations(
+  [...elements.sentenceHighlight.querySelectorAll('.word-token')],
+)));
 
 window.addEventListener('pagehide', () => engine.stop());
 

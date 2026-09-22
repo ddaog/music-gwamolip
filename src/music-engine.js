@@ -46,6 +46,17 @@ export function createStrudelCode(analysis) {
   const padSound = analysis.axes.tension > 0.48 ? 'sawtooth' : 'triangle';
   const sparkleGain = clamp(0.05 + analysis.axes.light * 0.08, 0.05, 0.13).toFixed(2);
   const hatPattern = analysis.axes.motion > 0.66 ? 'white*8' : 'white ~ white ~';
+  const words = analysis.tokens.length;
+  const syntax = analysis.syntax ?? {};
+  const ramp = (start, span) => {
+    const progress = clamp((words - start) / span, 0, 1);
+    return (progress * progress * (3 - 2 * progress)).toFixed(2);
+  };
+  const padGain = (0.025 + Number(ramp(1, 6)) * 0.13 + Math.min(syntax.adjective ?? 0, 3) * 0.008).toFixed(2);
+  const bassGain = (0.035 + Number(ramp(2, 6)) * 0.245 + Math.min(syntax.object ?? 0, 3) * 0.012).toFixed(2);
+  const sparkleGainLayer = (Number(sparkleGain) * Number(ramp(2, 7))).toFixed(2);
+  const rhythmGain = (0.012 + Number(ramp(3, 8)) * 0.055 + Math.min(syntax.adverb ?? 0, 3) * 0.006).toFixed(2);
+  const melodyGain = (0.18 + Number(ramp(1, 8)) * 0.2 + Math.min(syntax.predicate ?? 0, 2) * 0.018).toFixed(2);
 
   return `setcpm(${cpm})
 
@@ -56,7 +67,7 @@ stack(
     .lpf(${cutoff})
     .attack(${attack}).decay(.24).sustain(.18).release(.42)
     .room(${room}).delay(${delay}).delaytime(.25).delayfeedback(.28)
-    .gain(.34),
+    .gain(${melodyGain}),
 
   n("<${pad}>")
     .scale("${scale}")
@@ -64,28 +75,28 @@ stack(
     .lpf(${Math.round(cutoff * 0.46)})
     .attack(.38).decay(.5).sustain(.36).release(.9)
     .room(${Math.min(0.8, Number(room) + 0.12).toFixed(2)})
-    .gain(.12),
+    .gain(${padGain}),
 
   n("${bass}")
     .scale("${bassScale}")
     .s("sine")
     .lpf(520).attack(.03).decay(.32).sustain(.08).release(.2)
-    .gain(.24),
+    .gain(${bassGain}),
 
   n("<${take(analysis.layers.nearDegrees, 4).join(' ~ ')} ~>")
     .scale("${scale}")
     .s("sine")
     .attack(.01).decay(.12).sustain(0).release(.18)
-    .room(.68).delay(.22).gain(${sparkleGain}),
+    .room(.68).delay(.22).gain(${sparkleGainLayer}),
 
   note("${analysis.root}1 ~ ~ ${analysis.root}1")
     .s("sine")
     .penv(22).pdecay(.07)
-    .decay(.16).sustain(0).gain(.18),
+    .decay(.16).sustain(0).gain(${(0.025 + Number(ramp(4, 8)) * 0.19).toFixed(2)}),
 
   s("${hatPattern}")
     .hpf(${Math.round(4700 + analysis.axes.light * 2500)})
-    .decay(.035).sustain(0).room(.12).gain(.045)
+    .decay(.035).sustain(0).room(.12).gain(${rhythmGain})
 )`;
 }
 

@@ -52,3 +52,14 @@ test('generated Strudel code is playable structure without raw prose', () => {
   assert.match(code, /stack\(/);
   assert.doesNotMatch(code, /bright moon waits/i);
 });
+
+test('additional words gradually increase the arrangement layers', () => {
+  const sparseAnalysis = analyzeText('moon');
+  const layeredAnalysis = analyzeText('moon slowly shines above silver water while soft stars dance tonight');
+  const sparse = createStrudelCode(sparseAnalysis);
+  const layered = createStrudelCode(layeredAnalysis);
+  const totalGain = (code) => [...code.matchAll(/\.gain\(([\d.]+)\)/g)]
+    .reduce((sum, match) => sum + Number(match[1]), 0);
+  assert.ok(totalGain(layered) > totalGain(sparse) * 2);
+  assert.equal(layeredAnalysis.root, sparseAnalysis.root);
+});

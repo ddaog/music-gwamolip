@@ -137,7 +137,9 @@ export function analyzeText(rawText, variation = 0) {
     concepts.push({ id: 'unique', label: '고유한 리듬', score: 1, axes: {} });
   }
 
-  const seed = (hashString(text.normalize('NFC')) + variation * 2654435761) >>> 0;
+  // Anchor tonality to the opening word so later words layer onto the same musical scene.
+  const tonalAnchor = tokens[0] ?? text;
+  const seed = (hashString(tonalAnchor.normalize('NFC')) + variation * 2654435761) >>> 0;
   const roots = ['C', 'D', 'Eb', 'F', 'G', 'A', 'Bb'];
   const root = roots[seed % roots.length];
   let scale = axes.tension > 0.5 ? 'minor:pentatonic' : axes.light > 0.67 ? 'major:pentatonic' : 'dorian';
