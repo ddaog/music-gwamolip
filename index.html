@@ -5,27 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="한글과 영어 문장이 듣기 좋은 전자음악과 부드러운 디지털 이미지로 변하는 formyiru의 첫 번째 음악 놀이터"
+      content="음악과몰입 — 독립서점 공간과몰입에 문장과 소리를 남기는 방명록"
     />
     <meta name="theme-color" content="#e7e8e5" />
-    <title>문장의 파장 — formyiru</title>
+    <title>음악과몰입 — 공간과몰입의 소리 방명록</title>
   </head>
   <body>
     <div class="page-shell">
       <header class="site-header">
-        <a class="brand" href="#top" aria-label="formyiru">
+        <a class="brand" href="#top" aria-label="음악과몰입">
           <span class="brand-mark" aria-hidden="true">
             <i></i><i></i><i></i>
           </span>
-          <span>formyiru</span>
+          <span>음악과몰입</span>
         </a>
         <div class="project-meta"><span class="status-dot" aria-hidden="true"></span><span id="engine-label">sound asleep</span></div>
       </header>
 
       <main id="top">
+        <div class="guest-welcome"><p>공간과몰입에 남기는 소리 방명록</p><button id="guest-gallery-open" type="button" aria-haspopup="dialog" aria-controls="guest-gallery">남겨진 문장들 ↗</button></div>
         <section class="hero-grid" aria-labelledby="page-title">
           <div class="copy-panel">
-            <h1 id="page-title" class="visually-hidden">문장의 파장</h1>
+            <h1 id="page-title" class="visually-hidden">음악과몰입</h1>
 
             <div class="composer" aria-label="문장 음악 만들기">
               <label class="visually-hidden" for="sentence">문장 입력</label>
@@ -38,7 +39,7 @@
                   rows="3"
                   spellcheck="false"
                   aria-describedby="sentence-help"
-                  placeholder="문장을 입력하세요"
+                  placeholder="오늘 이곳에서 머문 마음을 남겨주세요"
                 ></textarea>
                 <span class="char-count"><b id="char-count">0</b>/180</span>
               </div>
@@ -89,6 +90,7 @@
               <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog" aria-label="문장 분석 보기">⌁</button>
               </details>
               <div class="record-controls"><button id="record-button" type="button">● 음악 녹음</button><span id="record-status" role="status">마이크 없이 음악만 저장</span><a id="record-save" hidden>파일 저장 ↓</a></div>
+              <div class="guest-actions"><button id="guest-save" type="button" aria-haspopup="dialog" aria-controls="guest-save-dialog">이 문장 남기기</button><button id="guest-new" type="button">새 방명록 쓰기</button><span id="guest-status" role="status">이 컴퓨터에 문장과 음악 코드가 함께 남습니다.</span></div>
             </div>
           </div>
 
@@ -126,6 +128,24 @@
           </div>
         </section>
 
+        <dialog id="guest-save-dialog" class="reading-dialog" aria-labelledby="guest-save-title">
+          <div class="dialog-header"><div><p class="eyebrow">LEAVE A NOTE</p><h2 id="guest-save-title">당신의 문장을 남겨주세요</h2></div><button id="guest-save-cancel" class="dialog-close" type="button" aria-label="저장 취소">×</button></div>
+          <form id="guest-save-form" class="reading-content">
+            <p id="guest-save-preview" class="guest-card-text"></p>
+            <label class="guest-author-label" for="guest-author">남기는 이름 <small>선택</small></label><input id="guest-author" maxlength="32" placeholder="이름 없는 독자" autocomplete="off" autofocus />
+            <p class="guest-privacy">문장과 음악 코드가 이 브라우저에 저장되며, 이 컴퓨터를 사용하는 다른 방문자가 갤러리에서 볼 수 있습니다. 개인정보는 남기지 마세요.</p>
+            <p id="guest-save-error" role="alert"></p><button id="guest-save-confirm" type="submit">방명록에 남기기</button>
+          </form>
+        </dialog>
+        <dialog id="guest-gallery" class="reading-dialog guest-gallery" aria-labelledby="gallery-title">
+          <header class="dialog-header"><div><p class="eyebrow">음악과몰입 / LOCAL COLLECTION</p><h2 id="gallery-title">이곳에 머문 문장들</h2></div><button id="gallery-close" class="dialog-close" type="button" aria-label="방명록으로 돌아가기" autofocus>×</button></header>
+          <div class="gallery-player"><span id="gallery-playing"></span><button id="gallery-playback" type="button">소리 멈추기</button></div>
+          <div class="reading-content">
+            <div class="gallery-tools"><span id="gallery-count">0개의 문장</span><button id="gallery-refresh" type="button">새로 읽기</button></div>
+            <p id="gallery-message" role="status"></p><div id="gallery-list"></div>
+            <div class="gallery-backup"><p>같은 사이트 주소·브라우저에 저장된 작품입니다.<br>브라우저 데이터 삭제 시 사라질 수 있으니 백업해주세요.</p><button id="gallery-export" type="button">전체 백업 만들기</button><a id="gallery-download" hidden>백업 파일 저장 ↓</a></div>
+          </div>
+        </dialog>
         <dialog id="semantic-dialog" class="reading-dialog" aria-labelledby="semantic-title">
           <div class="dialog-shell">
             <header class="dialog-header"><div><p class="eyebrow">WORDS → MEANING → SOUND</p><h2 id="semantic-title">단어를 어떻게 읽었나요?</h2></div><button id="semantic-close" class="dialog-close" type="button" aria-label="AI 해석 닫기" autofocus>×</button></header>
@@ -210,7 +230,7 @@
         </dialog>
       </main>
 
-      <footer><p>formyiru</p><p>© 2026</p></footer>
+      <footer><p>공간과몰입 · powered by formyiru</p><p>음악과몰입</p></footer>
     </div>
 
     <script type="module" src="/src/main.js"></script>

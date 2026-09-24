@@ -1,6 +1,9 @@
 import './styles.css';
 import './reading.css';
 import './code-layout.css';
+import './guestbook.css';
+import { setupGuestbook } from './guestbook.js';
+import { validateSnapshot } from './guestbook-store.js';
 import { MusicRecorder } from './music-recorder.js';
 import { SemanticClient } from './semantic-client.js';
 import { addMeaningLinks } from './meaning-links.js';
@@ -82,6 +85,7 @@ let audioRevision = 0;
 let autoPlayEnabled = true;
 let relationFrame;
 let composing = false;
+let restoredWork = false;
 let semanticState = { text: '', meanings: {}, similarities: [] };
 let semanticReady = false;
 function updateSemanticSummary() {
@@ -93,7 +97,7 @@ function updateSemanticSummary() {
 }
 const semanticClient = new SemanticClient({
   onResult(text, result) {
-    if (composing || text !== elements.sentence.value) return;
+    if (restoredWork || composing || text !== elements.sentence.value) return;
     semanticState = { text, ...result };
     analyzeCurrentText({ keepVariation: true, refreshSemantics: false });
     if (autoPlayEnabled && engine.playing) applyLatestAudio();
@@ -118,7 +122,7 @@ const semanticClient = new SemanticClient({
     if (status === 'error') {
       document.querySelector('#semantic-enabled').checked = false;
       semanticState = { text: '', meanings: {}, similarities: [] };
-      if (!composing) {
+      if (!composing && !restoredWork) {
         analyzeCurrentText({ keepVariation: true, refreshSemantics: false });
         if (autoPlayEnabled && engine.playing) applyLatestAudio();
       }
@@ -342,6 +346,7 @@ function renderRelations(wordNodes) {
 }
 
 function analyzeCurrentText({ keepVariation = false, refreshSemantics = true } = {}) {
+  restoredWork = false;
   if (!keepVariation) variation = 0;
   const text = elements.sentence.value;
   analysis = analyzeText(text, variation, semanticClient.enabled ? semanticState.meanings : {});
@@ -359,6 +364,7 @@ function updatePlaybackStatus() {
   elements.actionLabel.textContent = engine.playing ? '소리 멈추기' : '문장을 연주하기';
   elements.engineLabel.textContent = engine.playing ? 'sound awake' : 'sound asleep';
   document.querySelector('#code-state').textContent = engine.playing ? '연주 중' : '대기';
+  window.dispatchEvent(new Event('formyiru:playback'));
 }
 
 function stopPlayback(message = '연주를 멈췄어요. 문장을 바꾸거나 다시 시작해보세요.') {
@@ -412,7 +418,7 @@ async function playCurrent() {
 
   autoPlayEnabled = true;
   audioRevision += 1;
-  analyzeCurrentText({ keepVariation: true });
+  if (!restoredWork) analyzeCurrentText({ keepVariation: true });
   elements.actionLabel.textContent = '소리 멈추기';
   elements.status.textContent = '문장의 첫 소리를 찾고 있어요…';
   await applyLatestAudio();
@@ -591,6 +597,48 @@ window.addEventListener('pagehide', () => { clearTimeout(semanticStartup); recor
 elements.charCount.textContent = elements.sentence.value.length;
 elements.lexiconStats.textContent = `${LEXICON_STATS.concepts} imagery groups · ${(LEXICON_STATS.korean + LEXICON_STATS.english).toLocaleString()} ko/en words`;
 renderAnalysis();
+
+setupGuestbook({
+  capture() {
+    if (composing) throw new Error('글자 입력을 마친 뒤 다시 눌러주세요.');
+    return structuredClone({text:elements.sentence.value, code, analysis, beat, variation});
+  },
+  async load(snapshot) {
+    if (!validateSnapshot(snapshot)) throw new Error('읽을 수 없는 작품입니다.');
+    restoredWork = true;
+    semanticClient.invalidate();
+    clearTimeout(updateTimer);
+    if (audioTask) await audioTask;
+    elements.sentence.value = snapshot.text;
+    elements.charCount.textContent = snapshot.text.length;
+    analysis = snapshot.analysis;
+    variation = snapshot.variation;
+    Object.assign(beat, snapshot.beat);
+    // Recompile validated data, rather than evaluating arbitrary stored code.
+    code = createStrudelCode(analysis, beat);
+    document.querySelector('#beat-mode').value = beat.mode;
+    document.querySelector('#beat-intensity').value = Math.round(beat.intensity * 100);
+    document.querySelector('#beat-value').value = `${Math.round(beat.intensity * 100)}%`;
+    semanticState = {text:'', meanings:{}, similarities:[]};
+    renderAnalysis();
+    autoPlayEnabled = true;
+    audioRevision++;
+    await applyLatestAudio();
+    if (!engine.playing) throw new Error('재생을 시작할 수 없어요.');
+  },
+  newEntry() {
+    stopPlayback();
+    semanticClient.invalidate();
+    semanticState = {text:'', meanings:{}, similarities:[]};
+    elements.sentence.value = '';
+    elements.charCount.textContent = '0';
+    analyzeCurrentText();
+    autoPlayEnabled = true;
+    elements.sentence.focus();
+  },
+  playback:() => ({playing:engine.playing, text:elements.sentence.value}),
+  togglePlayback:playCurrent,
+});
 
 // Leave the first paint free; inference and model preparation run in a worker.
 const semanticStartup = setTimeout(() => {
