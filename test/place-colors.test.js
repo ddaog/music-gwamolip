@@ -4,7 +4,7 @@ import { visualProfileForToken } from '../src/visualizer.js';
 
 test('bookstore and neighborhood easter eggs use their signature gradients', () => {
   const cases = [
-    ['공간과몰입', '#df493b, #d5ac20, #3479cf'],
+    ['공간과몰입', '#ff0000, #ffdd00, #0047ff'],
     ['낙산공원', '#297849, #79ad48, #348563'],
     ['혜화', '#66b8dd, #3166c7'],
     ['오쏘파스타', '#bb8534, #e2bc67, #c89542'],

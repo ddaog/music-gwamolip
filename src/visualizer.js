@@ -91,7 +91,7 @@ export function visualProfileForToken(id, token = '', traits = {}) {
 }
 
 const PLACE_COLORS = [
-  { word: '공간과몰입', colors: ['#df493b', '#d5ac20', '#3479cf'] },
+  { word: '공간과몰입', colors: ['#ff0000', '#ffdd00', '#0047ff'] },
   { word: '낙산공원', colors: ['#297849', '#79ad48', '#348563'] },
   { word: '혜화', colors: ['#66b8dd', '#3166c7'] },
   { word: '오쏘파스타', colors: ['#bb8534', '#e2bc67', '#c89542'] },
