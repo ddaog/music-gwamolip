@@ -1,7 +1,7 @@
 let previous = [];
 export function codeLayers(source) {
   return source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line)).map((line) => {
-    const label = line.includes('.penv(') ? 'KICK' : line.includes('.hpf(7200)') ? 'HI-HAT'
+    const label = line.includes('.pan(.65)') ? 'RELATION' : line.includes('.penv(') ? 'KICK' : line.includes('.hpf(7200)') ? 'HI-HAT'
       : line.includes('.hpf(') ? 'SNARE' : /2:(?:major|minor)/u.test(line) ? 'BASS'
       : /3:(?:major|minor)/u.test(line) ? 'CHORDS' : line.includes('.s("sine")') ? 'SPARKLE' : 'MELODY';
     const sound = line.match(/\.s\("([a-z]+)"\)/u)?.[1] ?? 'noise';

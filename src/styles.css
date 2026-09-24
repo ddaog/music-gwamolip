@@ -1347,6 +1347,12 @@ footer { min-height:28px; }
 }
 
 #code-details { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:4px; font:inherit; }
+.semantic-controls { display:grid; gap:6px; padding:12px; margin:8px 0; border:1px solid var(--line); border-radius:8px; }
+.semantic-controls label { display:flex; align-items:center; gap:8px; }
+.semantic-controls input { accent-color:#e8663d; }
+.semantic-controls small { font-size:10px; line-height:1.5; }
+.relation-path.is-repetition { stroke:#78928a; stroke-width:1; opacity:.65; }
+.relation-path.is-semantic { stroke:#8795a6; stroke-dasharray:1 5; opacity:.42; }
 #live-code { display:block; }
 #live-code .code-line { width:max-content; min-width:100%; padding:0 8px 0 28px; font-size:10px; }
 #live-code .code-line::before { left:8px; }

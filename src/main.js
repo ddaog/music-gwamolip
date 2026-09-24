@@ -1,4 +1,6 @@
 import './styles.css';
+import { SemanticClient } from './semantic-client.js';
+import { addMeaningLinks } from './meaning-links.js';
 import { editorFontSize } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
 import { renderLiveCode } from './live-code.js';
@@ -47,7 +49,7 @@ const elements = {
 const engine = new MusicEngine();
 let variation = 0;
 let analysis = analyzeText(elements.sentence.value, variation);
-analysis.syntax = analyzeSyntax(elements.sentence.value);
+analysis.syntax = addMeaningLinks(analyzeSyntax(elements.sentence.value));
 const beat = { mode: 'auto', intensity: 0.55 };
 const initialArrangement = createArrangement(analysis, beat);
 analysis.bpm = initialArrangement.bpm;
@@ -60,6 +62,28 @@ let audioRevision = 0;
 let autoPlayEnabled = true;
 let relationFrame;
 let composing = false;
+let semanticState = { text: '', meanings: {}, similarities: [] };
+const semanticClient = new SemanticClient({
+  onResult(text, result) {
+    if (composing || text !== elements.sentence.value) return;
+    semanticState = { text, ...result };
+    analyzeCurrentText({ keepVariation: true, refreshSemantics: false });
+    if (autoPlayEnabled && engine.playing) applyLatestAudio();
+  },
+  onStatus(status, progress) {
+    document.querySelector('#semantic-status').textContent = status === 'ready' ? '의미 연결 준비됨'
+      : status === 'loading' ? `모델 준비 중${progress === undefined ? '' : ` · ${progress}%`}`
+      : status === 'error' ? '모델 사용 불가 · 사전 모드로 계속' : '사전 모드';
+    if (status === 'error') {
+      document.querySelector('#semantic-enabled').checked = false;
+      semanticState = { text: '', meanings: {}, similarities: [] };
+      if (!composing) {
+        analyzeCurrentText({ keepVariation: true, refreshSemantics: false });
+        if (autoPlayEnabled && engine.playing) applyLatestAudio();
+      }
+    }
+  },
+});
 
 function syncEditorLayout() {
   const input = elements.sentence;
@@ -198,6 +222,7 @@ function renderRelations(wordNodes) {
       path.setAttribute('d', `M ${x1} ${y1} C ${bend} ${y1}, ${bend} ${y2}, ${x2} ${y2}`);
     }
     path.setAttribute('class', 'relation-path');
+    if (type === 'semantic' || type === 'repetition') path.classList.add(`is-${type}`);
     if (type === 'shared-subject') path.classList.add('is-shared');
     if (provisional) path.classList.add('is-provisional');
     svg.append(path);
@@ -212,15 +237,17 @@ function renderRelations(wordNodes) {
   }
 }
 
-function analyzeCurrentText({ keepVariation = false } = {}) {
+function analyzeCurrentText({ keepVariation = false, refreshSemantics = true } = {}) {
   if (!keepVariation) variation = 0;
-  analysis = analyzeText(elements.sentence.value, variation);
-  analysis.syntax = analyzeSyntax(elements.sentence.value);
+  const text = elements.sentence.value;
+  analysis = analyzeText(text, variation, semanticClient.enabled ? semanticState.meanings : {});
+  analysis.syntax = addMeaningLinks(analyzeSyntax(text), semanticClient.enabled && semanticState.text === text ? semanticState.similarities : []);
   const arrangement = createArrangement(analysis, beat);
   analysis.bpm = arrangement.bpm;
   analysis.scale = arrangement.scale;
   code = createStrudelCode(analysis, beat);
   renderAnalysis();
+  if (refreshSemantics) semanticClient.request(text, analysis.tokens);
 }
 
 function updatePlaybackStatus() {
@@ -317,6 +344,7 @@ elements.sentence.addEventListener('input', (event) => {
 });
 
 elements.sentence.addEventListener('compositionstart', () => {
+  semanticClient.invalidate();
   composing = true;
   window.clearTimeout(updateTimer);
   elements.sentence.parentElement.classList.add('is-composing');
@@ -358,6 +386,16 @@ document.querySelector('#beat-mode').addEventListener('change', (event) => {
   beat.mode = event.target.value;
   analyzeCurrentText({ keepVariation: true });
   if (engine.playing) applyLatestAudio();
+});
+
+document.querySelector('#semantic-enabled').addEventListener('change', (event) => {
+  if (event.target.checked) semanticClient.enable();
+  else {
+    semanticClient.disable();
+    semanticState = { text: '', meanings: {}, similarities: [] };
+  }
+  analyzeCurrentText({ keepVariation: true });
+  if (autoPlayEnabled && engine.playing) applyLatestAudio();
 });
 document.querySelector('#beat-intensity').addEventListener('input', (event) => {
   beat.intensity = Number(event.target.value) / 100;
@@ -411,7 +449,7 @@ window.visualViewport?.addEventListener('resize', syncViewport);
 window.addEventListener('resize', syncViewport);
 syncViewport();
 
-window.addEventListener('pagehide', () => engine.stop());
+window.addEventListener('pagehide', () => { engine.stop(); semanticClient.disable(); });
 
 elements.charCount.textContent = elements.sentence.value.length;
 elements.lexiconStats.textContent = `${LEXICON_STATS.concepts} imagery groups · ${(LEXICON_STATS.korean + LEXICON_STATS.english).toLocaleString()} ko/en words`;

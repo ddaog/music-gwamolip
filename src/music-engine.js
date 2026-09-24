@@ -16,6 +16,17 @@ export function createArrangement(analysis, beat = {}) {
   const contour = [0, 2, 4, 2, 6, 4, 2, 0];
   const rotation = analysis.seed % 3;
   const modifiers = analysis.syntax?.edges?.filter((edge) => edge.type === 'modifier').length ?? 0;
+  const relationships = analysis.syntax?.edges ?? [];
+  const relationEnergy = clamp(relationships.length / Math.max(1, count * 2), 0, 1);
+  const responseEdges = relationships.filter((edge) => ['repetition', 'semantic', 'shared-subject'].includes(edge.type)).slice(0, 4);
+  const relationMelody = chords.map((root) => {
+    const notes = Array(16).fill('~');
+    responseEdges.forEach((edge, i) => {
+      notes[i * 4] = String(root + contour[edge.from % contour.length]);
+      notes[i * 4 + 2] = String(root + contour[edge.to % contour.length]);
+    });
+    return notes.join(' ');
+  });
   const active = count < 3 ? [0, 4] : count < 6 ? [0, 2, 4, 6] : [0, 1, 2, 4, 5, 6];
   const melody = chords.map((root) => contour.map((_, step) => {
     if (!active.includes(step)) return '~';
@@ -28,7 +39,8 @@ export function createArrangement(analysis, beat = {}) {
   const drums = mode === 'off' ? 0 : intensity * (mode === 'on' ? 1 : ramp((count - 2) / 8));
   return {
     scale, chords, melody, richness, drums, tension,
-    rhythm: createRhythm(analysis, richness, tension),
+    relationMelody, relationGain: responseEdges.length ? .025 : 0,
+    rhythm: createRhythm(analysis, clamp(richness + relationEnergy * .25, 0, 1), tension),
     bpm: Math.round(clamp(76 + analysis.axes.motion * 30, 76, 108) / 2) * 2,
     padGain: 0.012 + richness * 0.06,
     bassGain: 0.02 + richness * 0.15,
@@ -61,6 +73,9 @@ export function createStrudelCode(analysis, beat = {}) {
   if (analysis.tokens.length < 6) parts.splice(3, 1);
   if (analysis.tokens.length < 3) parts.splice(2, 1);
   if (analysis.tokens.length < 2) parts.splice(1, 1);
+  if (arrangement.relationGain) {
+    parts.push('n("' + alternate(arrangement.relationMelody) + '").scale("' + scale + '").s("sine").pan(.65).attack(.015).decay(.12).sustain(0).release(.2).gain(' + gain(arrangement.relationGain) + ')');
+  }
   if (drums > 0) {
     parts.push(
       'note("' + alternate(rhythm.kick) + '").s("sine").penv(28).pdecay(.045).attack(.002).decay(.14).sustain(0).release(.035).gain(' + gain(drums * .34) + ')',

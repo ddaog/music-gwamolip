@@ -1,4 +1,5 @@
 import { CONCEPTS, FAR_CUES, NEAR_CUES, STOPWORDS } from './lexicon.js';
+import { EMOTION_IDS, negatedTokens } from './semantic-math.js';
 
 const FAR_CONCEPTS = new Set(CONCEPTS.filter((item) => item.layer === 'far').map((item) => item.id));
 const NEAR_CONCEPTS = new Set(CONCEPTS.filter((item) => item.layer === 'near').map((item) => item.id));
@@ -133,11 +134,13 @@ function phoneticImpression(token) {
   return result;
 }
 
-export function analyzeText(rawText, variation = 0) {
+export function analyzeText(rawText, variation = 0, semantics = {}) {
   const text = rawText.trim() || '고요한 빛이 천천히 흐른다.';
   const tokens = tokenize(text);
   const conceptScores = new Map();
   const tokenConcepts = new Map(tokens.map((token) => [token, new Set()]));
+  const semanticWeights = new Map();
+  const negated = negatedTokens(text);
   const axes = {
     warmth: 0.5,
     motion: 0.42,
@@ -156,6 +159,7 @@ export function analyzeText(rawText, variation = 0) {
       const vocabulary = /^[a-z]+$/u.test(normalized) ? concept.words.en : concept.words.ko;
       const match = forms.some((form) => vocabulary.some((word) => conceptWordMatches(form, word)));
       if (!match) continue;
+      if (negated.has(token) && EMOTION_IDS.has(concept.id)) continue;
       matchCount += 1;
       conceptScores.set(concept.id, (conceptScores.get(concept.id) ?? 0) + 1);
       tokenConcepts.get(token)?.add(concept.id);
@@ -164,8 +168,25 @@ export function analyzeText(rawText, variation = 0) {
       }
     }
     if (!matchCount) {
-      const impression = phoneticImpression(normalized);
-      for (const [axis, delta] of Object.entries(impression)) axes[axis] += delta;
+      const neighbors = (semantics[token]?.matches ?? []).filter((item) => !(negated.has(token) && EMOTION_IDS.has(item.id)));
+      if (neighbors.length) {
+        semanticWeights.set(token, new Map(neighbors.map((item) => [item.id, item.weight])));
+        for (const neighbor of neighbors) {
+          const concept = CONCEPTS.find((item) => item.id === neighbor.id);
+          if (!concept) continue;
+          tokenConcepts.get(token).add(concept.id);
+          conceptScores.set(concept.id, (conceptScores.get(concept.id) ?? 0) + neighbor.weight * .65);
+          for (const [axis, delta] of Object.entries(concept.axes)) axes[axis] += delta * impact * neighbor.weight * .65;
+        }
+        if (!negated.has(token)) {
+          for (const [axis, delta] of Object.entries(semantics[token]?.axes ?? {})) {
+            if (axis in axes) axes[axis] += clamp(delta, -.18, .18) * impact * .35;
+          }
+        }
+      } else {
+        const impression = phoneticImpression(normalized);
+        for (const [axis, delta] of Object.entries(impression)) axes[axis] += delta;
+      }
     }
   }
 
@@ -260,11 +281,14 @@ export function analyzeText(rawText, variation = 0) {
     const traits = Object.fromEntries(['warmth', 'motion', 'light', 'space', 'softness', 'tension'].map((axis) => [
       axis,
       matchedConcepts.length
-        ? matchedConcepts.reduce((sum, item) => sum + (item.axes[axis] ?? 0), 0) / matchedConcepts.length
+        ? matchedConcepts.reduce((sum, item) => sum + (item.axes[axis] ?? 0) * (semanticWeights.get(token)?.get(item.id) ?? 1 / matchedConcepts.length), 0)
         : clamp(0.5 + (phoneticTraits[axis] ?? 0) * 3.5),
     ]));
     return {
       token,
+      meaningSource: semanticWeights.has(token) ? 'embedding' : matchedConcepts.length ? 'dictionary' : 'phonetic',
+      semanticConfidence: semanticWeights.has(token) ? semantics[token]?.matches?.[0]?.score : undefined,
+      negated: negated.has(token),
       conceptIds: ids,
       primaryConcept: ids[0] ?? 'unique',
       layer,
