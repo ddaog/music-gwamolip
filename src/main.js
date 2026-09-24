@@ -1,12 +1,13 @@
 import './styles.css';
+import './reading.css';
 import { SemanticClient } from './semantic-client.js';
 import { addMeaningLinks } from './meaning-links.js';
-import { createModularPatch } from './modular-patch.js';
+import { createModularPatch, patchDescriptions } from './modular-patch.js';
 import { editorFontSize } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
 import { renderLiveCode } from './live-code.js';
 import { analyzeText, describeAnalysis } from './text-analyzer.js';
-import { LEXICON_STATS } from './lexicon.js';
+import { LEXICON_STATS, CONCEPTS } from './lexicon.js';
 import { createArrangement, createStrudelCode, MusicEngine } from './music-engine.js';
 import { Visualizer, visualProfileFor, visualProfileForToken } from './visualizer.js';
 
@@ -70,7 +71,7 @@ function updateSemanticSummary() {
   const words = analysis.tokenMeanings.filter((word) => word.meaningSource === 'embedding').length;
   const links = analysis.syntax.edges.filter((edge) => edge.type === 'semantic').length;
   document.querySelector('#semantic-summary').textContent = words || links
-    ? `의미 확장 · ${words}단어 · ${links}연결` : '의미 확장 켜짐';
+    ? `AI 해석 · ${words}단어 · ${links}연결` : 'AI 단어 해석 켜짐';
 }
 const semanticClient = new SemanticClient({
   onResult(text, result) {
@@ -84,19 +85,18 @@ const semanticClient = new SemanticClient({
     const justReady = status === 'ready' && !semanticReady;
     semanticReady = status === 'ready';
     indicator.dataset.state = status;
-    indicator.setAttribute('aria-pressed', String(semanticReady));
-    indicator.setAttribute('aria-label', status === 'loading' ? '의미 확장 다운로드 취소' : semanticReady ? '의미 확장 끄기' : '의미 확장 켜기');
     document.querySelector('#semantic-enabled').checked = semanticReady;
     document.querySelector('#semantic-enabled').indeterminate = status === 'loading';
-    document.querySelector('#semantic-summary').textContent = status === 'loading' ? '의미 준비 중'
-      : status === 'error' ? '의미 확장 재시도' : '의미 확장';
+    document.querySelector('#semantic-summary').textContent = status === 'loading' ? 'AI 단어 해석 · 준비 중'
+      : status === 'error' ? 'AI 해석 재시도' : 'AI 단어 해석';
     updateSemanticSummary();
     if (justReady && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       indicator.animate([{ boxShadow: '0 0 0 0 #779b8555' }, { boxShadow: '0 0 0 9px #779b8500' }], { duration: 1100 });
     }
-    document.querySelector('#semantic-status').textContent = status === 'ready' ? '의미 연결 준비됨'
+    document.querySelector('#semantic-status').textContent = status === 'ready' ? 'AI 단어 해석 사용 중 · 이 기기에서 처리'
       : status === 'loading' ? '모델 다운로드 · 기기 내 준비 중'
       : status === 'error' ? '모델 사용 불가 · 사전 모드로 계속' : '사전 모드';
+    renderSemanticDetails();
     if (status === 'error') {
       document.querySelector('#semantic-enabled').checked = false;
       semanticState = { text: '', meanings: {}, similarities: [] };
@@ -140,11 +140,24 @@ function metricNumber(value) {
 }
 
 function renderAnalysis() {
+  const hasText = Boolean(elements.sentence.value.trim());
+  const patch = createModularPatch(analysis);
+  document.querySelector('#reading-sentence').textContent = hasText ? elements.sentence.value : '아직 발견한 문장이 없어요.';
+  document.querySelector('#reading-meta').textContent = hasText ? `${analysis.tokens.length} WORDS · ${patch.modules.length} MODULES · ${analysis.bpm} BPM` : '문장을 입력하면 소리의 구성이 여기에 나타납니다.';
+  const patches = document.querySelector('#reading-patches');
+  patches.replaceChildren();
+  const descriptions = hasText ? patchDescriptions(patch) : [];
+  for (const label of descriptions.length ? descriptions : ['문장이 이어지면 모듈 사이의 연결이 나타납니다.']) {
+    const row = document.createElement('p');
+    row.className = descriptions.length ? 'reading-patch-row' : 'reading-empty';
+    row.textContent = label;
+    patches.append(row);
+  }
   const labels = elements.sentence.value.trim() ? analysis.concepts.slice(0, 3).map((concept) => concept.label) : [];
   elements.visualTitle.textContent = labels.join(' · ') || '—';
   elements.keywordList.innerHTML = '';
 
-  for (const [index, concept] of analysis.concepts.entries()) {
+  for (const [index, concept] of (hasText ? analysis.concepts : []).entries()) {
     const profile = visualProfileFor(concept.id);
     const item = document.createElement('span');
     item.className = 'keyword';
@@ -161,8 +174,8 @@ function renderAnalysis() {
 
   for (const [axis, parts] of Object.entries(elements.metrics)) {
     const value = metricNumber(analysis.axes[axis]);
-    parts.value.textContent = String(value).padStart(2, '0');
-    parts.bar.style.width = `${value}%`;
+    parts.value.textContent = hasText ? String(value).padStart(2, '0') : '—';
+    parts.bar.style.width = `${hasText ? value : 0}%`;
   }
 
   for (const [axis, parts] of Object.entries(elements.dials)) {
@@ -171,15 +184,51 @@ function renderAnalysis() {
     parts.knob.style.setProperty('--dial-angle', `${-135 + value * 2.7}deg`);
   }
 
-  elements.translationNote.textContent = describeAnalysis(analysis);
-  elements.farWords.textContent = analysis.layers.farTokens.join(' · ');
-  elements.nearWords.textContent = analysis.layers.nearTokens.join(' · ');
-  elements.code.textContent = code;
+  elements.translationNote.textContent = hasText ? describeAnalysis(analysis) : '입력한 단어의 심상과 관계를 음악으로 해석합니다.';
+  elements.farWords.textContent = hasText ? analysis.layers.farTokens.join(' · ') || '—' : '—';
+  elements.nearWords.textContent = hasText ? analysis.layers.nearTokens.join(' · ') || '—' : '—';
+  elements.code.textContent = hasText ? code : '// 문장을 기다리는 중';
   renderLiveCode(document.querySelector('#live-code'), elements.sentence.value.trim() ? code : '');
   document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? (autoPlayEnabled ? '입력 반영 중' : '코드 준비됨') : '대기';
   renderWordHighlight();
   updateSemanticSummary();
+  renderSemanticDetails();
   visualizer.setAnalysis(analysis);
+}
+
+function renderSemanticDetails() {
+  const state = document.querySelector('#semantic-indicator').dataset.state;
+  const hasText = Boolean(elements.sentence.value.trim());
+  const unavailable = state === 'loading' ? 'AI 준비가 끝나면 이 문장의 해석을 보여드릴게요.' : 'AI 단어 해석을 켜면 추가 해석과 유사어 연결을 확인할 수 있어요.';
+  document.querySelector('#semantic-detail-status').textContent = state === 'loading'
+    ? 'AI 모델 준비 중 · 기본 음악은 계속 사용할 수 있어요.'
+    : state === 'error' ? '준비하지 못했어요. 기본 사전으로 연주합니다.'
+    : semanticReady ? 'AI 해석 사용 중' : '기본 사전으로 연주 중';
+  document.querySelector('#semantic-toggle').textContent = state === 'loading' ? '준비 취소' : semanticReady ? 'AI 해석 끄기' : 'AI 해석 켜기';
+  const render = (selector, rows, empty) => {
+    const host = document.querySelector(selector);
+    host.replaceChildren();
+    if (!rows.length) { const p = document.createElement('p'); p.className = 'reading-empty'; p.textContent = empty; host.append(p); }
+    for (const [title, detail] of rows) {
+      const row = document.createElement('div'); row.className = 'semantic-result';
+      const heading = document.createElement('strong'); heading.textContent = title;
+      const description = document.createElement('p'); description.textContent = detail;
+      row.append(heading, description); host.append(row);
+    }
+  };
+  const words = hasText && semanticReady ? analysis.tokenMeanings.filter((word) => word.meaningSource === 'embedding') : [];
+  const labels = (ids) => ids.map((id) => CONCEPTS.find((concept) => concept.id === id)?.label ?? id).join(' · ');
+  render('#semantic-words', words.map((word) => [`${word.token} → ${labels(word.conceptIds)}`, '이 심상의 온도·움직임·빛·여백을 음색과 문장의 음악 특성에 반영했습니다.']),
+    !hasText ? '먼저 문장을 입력해보세요.' : !semanticReady ? unavailable : '추가 해석한 단어는 없어요. 사전이 이미 아는 단어이거나, 뜻이 충분히 가깝지 않은 단어입니다.');
+  const patch = createModularPatch(analysis);
+  const links = hasText && semanticReady ? analysis.syntax.edges.filter((edge) => edge.type === 'semantic') : [];
+  render('#semantic-links', links.map((edge) => {
+    const a = analysis.syntax.words[edge.from]?.token, b = analysis.syntax.words[edge.to]?.token;
+    const cable = patch.cables.find((item) => !item.normalled && ((item.from === edge.from && item.to === edge.to) || (item.to === edge.from && item.from === edge.to)));
+    const similarity = semanticState.similarities.find((item) => (item.a === a && item.b === b) || (item.a === b && item.b === a));
+    const score = similarity ? `유사도 ${similarity.score.toFixed(2)} · ` : '';
+    return [`${a} ↔ ${b}`, score + (cable ? `M${cable.source + 1}의 LFO가 M${cable.target + 1}의 필터를 움직입니다.` : '관계 밀도에 반영되며, 응답 선율의 연결 후보로 사용됩니다.')];
+  }), !hasText ? '바다 ocean처럼 비슷한 뜻의 단어를 함께 써보세요.' : !semanticReady ? unavailable : '아직 추가된 유사어 연결이 없어요. 반복어·문법 연결은 별도로 동작합니다.');
 }
 
 function renderWordHighlight() {
@@ -438,7 +487,15 @@ document.querySelector('#semantic-enabled').addEventListener('change', (event) =
   // A pending checkbox represents a cancellable download, not an active model.
   setSemanticEnabled(semanticClient.enabled ? false : event.target.checked);
 });
-document.querySelector('#semantic-indicator').addEventListener('click', () => setSemanticEnabled(!semanticClient.enabled));
+document.querySelector('#semantic-indicator').addEventListener('click', () => {
+  renderSemanticDetails();
+  document.querySelector('#semantic-dialog').showModal();
+});
+document.querySelector('#semantic-toggle').addEventListener('click', () => setSemanticEnabled(!semanticClient.enabled));
+document.querySelector('#semantic-close').addEventListener('click', () => document.querySelector('#semantic-dialog').close());
+document.querySelector('#semantic-dialog').addEventListener('click', (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
 document.querySelector('#beat-intensity').addEventListener('input', (event) => {
   beat.intensity = Number(event.target.value) / 100;
   document.querySelector('#beat-value').value = `${event.target.value}%`;
@@ -449,6 +506,7 @@ document.querySelector('#beat-intensity').addEventListener('input', (event) => {
 
 elements.readingTrigger.addEventListener('click', () => elements.readingDialog.showModal());
 document.querySelector('#code-details').addEventListener('click', () => {
+  document.querySelector('.code-drawer').open = true;
   elements.readingDialog.showModal();
   elements.code.scrollIntoView({ block: 'center' });
 });
@@ -504,7 +562,7 @@ const semanticStartup = setTimeout(() => {
   const connection = navigator.connection;
   if (preference === 'false') return;
   if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) {
-    document.querySelector('#semantic-summary').textContent = '의미 확장 · 다운로드';
+    document.querySelector('#semantic-summary').textContent = 'AI 단어 해석 · 다운로드';
     document.querySelector('#semantic-status').textContent = '데이터 절약 중 · 직접 켜서 다운로드';
     return;
   }

@@ -52,13 +52,14 @@
                 <button id="variation-button" class="secondary-action" type="button">
                   <span aria-hidden="true">↝</span> 변주
                 </button>
-                <button id="semantic-indicator" class="semantic-indicator" type="button" aria-label="의미 확장 켜기" aria-pressed="false"><span aria-hidden="true">✦</span><span id="semantic-summary" role="status">의미 확장</span></button>
+                <button id="semantic-indicator" class="semantic-indicator" type="button" aria-label="AI 단어 해석 결과 보기" aria-haspopup="dialog" aria-controls="semantic-dialog" title="어떤 단어를 해석하고 연결했는지 보기"><span aria-hidden="true">✦</span><span id="semantic-summary" role="status">AI 단어 해석</span></button>
               </div>
               <p class="status-line" id="status-line" aria-live="polite"> </p>
               <details class="instrument-settings">
                 <summary>비트 · 가이드</summary>
                 <div class="semantic-controls">
-                  <label><input id="semantic-enabled" type="checkbox" /> 의미 확장 · 기기 내 AI</label>
+                  <label><input id="semantic-enabled" type="checkbox" /> AI 단어 해석</label>
+                  <small id="semantic-help">사전에 없는 단어도 비슷한 뜻을 찾아 음악에 반영합니다. 준비 중에도 기본 음악은 재생됩니다.</small>
                   <small>첫 방문에 약 120MB + 실행 파일을 준비하고 자동 적용합니다. 입력 문장은 전송하지 않습니다. 끄면 다음 방문에도 자동 다운로드하지 않습니다.</small>
                   <span id="semantic-status" role="status">사전 모드</span>
                 </div>
@@ -124,33 +125,46 @@
           </div>
         </section>
 
+        <dialog id="semantic-dialog" class="reading-dialog" aria-labelledby="semantic-title">
+          <div class="dialog-shell">
+            <header class="dialog-header"><div><p class="eyebrow">WORDS → MEANING → SOUND</p><h2 id="semantic-title">단어를 어떻게 읽었나요?</h2></div><button id="semantic-close" class="dialog-close" type="button" aria-label="AI 해석 닫기" autofocus>×</button></header>
+            <div class="reading-content">
+              <p class="semantic-intro">사전에 없는 단어는 비슷한 뜻을 찾아 음색과 분위기에 반영하고, 뜻이 가까운 단어들은 연결합니다.</p>
+              <div class="semantic-dialog-state"><span id="semantic-detail-status" role="status"></span><button id="semantic-toggle" type="button">AI 해석 켜기</button></div>
+              <section class="semantic-results"><h3>새로 읽은 단어</h3><div id="semantic-words"></div></section>
+              <section class="semantic-results"><h3>뜻이 가까운 연결</h3><div id="semantic-links"></div></section>
+              <p class="semantic-footnote">이미 사전에 있는 단어는 기존 해석을 유지합니다. 유사도는 뜻의 가까움이지 정답 확률은 아니며, 문맥에 따라 해석이 다를 수 있어요. 입력은 이 기기에서 처리합니다.</p>
+            </div>
+          </div>
+        </dialog>
         <dialog id="reading-dialog" class="reading-dialog" aria-labelledby="reading-title">
           <div class="dialog-shell">
             <header class="dialog-header">
               <div>
-                <p class="eyebrow"><span>02</span> the reading</p>
+                <p class="eyebrow">TEXT → SOUND</p>
                 <h2 id="reading-title">문장에서 발견한 것</h2>
               </div>
-              <button id="reading-close" class="dialog-close" type="button" aria-label="해석 닫기">×</button>
+              <button id="reading-close" class="dialog-close" type="button" aria-label="해석 닫기" autofocus>×</button>
             </header>
             <div class="reading-content">
+            <div class="reading-source"><p id="reading-sentence"></p><span id="reading-meta"></span></div>
             <div class="keyword-block">
               <div class="keyword-heading">
                 <span class="small-label">인식한 심상</span>
-                <span id="lexicon-stats" class="lexicon-stats"></span>
+                <span class="reading-section-index">01 / IMAGERY</span>
               </div>
               <div id="keyword-list" class="keyword-list"></div>
             </div>
 
             <div class="distance-reading" aria-label="시적 거리 해석">
               <article>
-                <span class="distance-index">far / 01</span>
+                <span class="distance-index">02 / BACKGROUND</span>
                 <h3>원경</h3>
                 <p id="far-words"></p>
                 <small>background · pad · bass</small>
               </article>
               <article>
-                <span class="distance-index">near / 02</span>
+                <span class="distance-index">03 / MELODY</span>
                 <h3>근경</h3>
                 <p id="near-words"></p>
                 <small>melody · top line</small>
@@ -176,7 +190,9 @@
               </div>
             </div>
 
-            <p id="translation-note" class="translation-note"></p>
+            <section class="reading-patch" aria-label="문장 간 패치"><div class="keyword-heading"><span class="small-label">문장 간 연결</span><span class="reading-section-index">04 / PATCH</span></div><div id="reading-patches"></div></section>
+
+            <details class="reading-explanation"><summary>해석 자세히</summary><p id="translation-note" class="translation-note"></p><p id="lexicon-stats" class="lexicon-stats"></p></details>
 
             <details class="code-drawer">
               <summary>
