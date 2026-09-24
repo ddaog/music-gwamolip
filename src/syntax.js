@@ -19,6 +19,11 @@ function englishVerb(word) {
   return forms.some((form) => verbs.has(form));
 }
 function roleFor(token) {
+  if (/^(?:좋은|무슨|어떤)$/u.test(token)) return 'adjective';
+  if (/^(?:늘|항상|이렇게|그렇게|저렇게)$/u.test(token)) return 'adverb';
+  // Conversational endings must be checked before -게 (adverb) / -에 (place).
+  if (/^(?:하|해|했|되|됐)(?:고|며|면서|지만|는데|니|지|게|겠어|어요)$/u.test(token)
+    || /(?:다고|라고)$/u.test(token)) return 'predicate';
   if (conjunctions.has(token)) return 'conjunction';
   if (determiners.has(token)) return 'determiner';
   if (prepositions.has(token)) return 'preposition';
@@ -54,10 +59,11 @@ export function analyzeSyntax(text) {
     const lineBoundary = /\n/u.test(gap) && (role === 'subject' || previousRole === 'predicate');
     if (/[,.!?;]/u.test(gap) || lineBoundary) clause += 1;
     if (/[.!?]/u.test(gap) || lineBoundary) sentence += 1;
-    previousRole = role;
+    const continues = role === 'predicate' && /(?:고|며|면서|지만|는데)$/u.test(token);
+    previousRole = continues ? 'connective' : role;
     previousEnd = match.index + match[0].length;
     const word = { token, index, clause, sentence, role };
-    if (role === 'predicate' && /[가-힣]/u.test(token) && /(?:고|며|면서|지만)$/u.test(token)) clause += 1;
+    if (continues && /[가-힣]/u.test(token)) clause += 1;
     return word;
   });
   // Split coordinating clauses only when both sides contain a verb.
@@ -120,7 +126,26 @@ export function analyzeSyntax(text) {
     const a = predicates[i - 1], b = predicates[i];
     if (a.sentence === b.sentence && a.clause !== b.clause) add(a.index, b.index, 'continuation');
   }
-  // Repeated explicit subjects form a hub; never merge different pronouns or infer omitted subjects.
+  // Carry an explicit subject through connected predicates, but never across
+  // sentence punctuation or a replacement subject. Reported clauses temporarily
+  // own their inner subject (생각이 난다고), then return to the outer subject.
+  let activeSubject = null;
+  for (const clauseId of new Set(words.map((word) => word.clause))) {
+    const group = words.filter((word) => word.clause === clauseId);
+    if (activeSubject?.sentence !== group[0].sentence) activeSubject = null;
+    const heads = group.filter((word) => word.role === 'predicate');
+    const explicit = group.find((word) => word.role === 'subject')
+      ?? group.find((word) => /^[a-z]+$/u.test(word.token) && edges.some((edge) => edge.from === word.index && edge.type === 'subject'));
+    const owner = explicit ?? activeSubject;
+    if (owner) {
+      for (const head of heads) {
+        if (owner.index < head.index) add(owner.index, head.index, 'shared-subject');
+      }
+    }
+    const reported = heads.some((head) => /(?:다고|라고)$/u.test(head.token));
+    if (explicit && !(reported && activeSubject)) activeSubject = explicit;
+  }
+  // Repeated explicit subjects also form a hub across sentences.
   const subjectHubs = new Map();
   for (const word of words) {
     const subjectEdge = edges.find((edge) => edge.from === word.index && edge.type === 'subject');

@@ -16,6 +16,10 @@ test('repeated English subjects share their predicate branches', () => {
 });
 
 const cases = [
+  ['안녕? 나는 너를 보고\n무슨 생각을 했게?', ['나는→보고', '나는→했게', '생각을→했게']],
+  ['너는 늘 나를 보고 좋은 생각이 난다고 했는데.', ['너는→보고', '생각이→난다고', '너는→했는데', '좋은→생각이']],
+  ['나는 음악을 듣고 춤을 춘다.', ['나는→듣고', '나는→춘다']],
+  ['I sing and dance.', ['i→sing', 'i→dance']],
   ['너는 늘\n나에게\n기쁨을 주지', ['너는→주지', '나에게→주지', '기쁨을→주지']],
   ['You\ngive me\njoy', ['you→give', 'joy→give']],
   ['나는 너를 좋아해', ['나는→좋아해', '너를→좋아해']],
@@ -41,4 +45,13 @@ test('unfinished phrases expose provisional edges and complete sentences replace
   assert.equal(analyzeSyntax('').edges.length, 0);
   const parsed = analyzeSyntax('나는 음악을 듣고 너는 그림을 그린다.');
   assert.ok(!parsed.edges.some(({ from, to }) => parsed.words[from].token === '음악을' && parsed.words[to].token === '그린다'));
+});
+
+test('inherited subjects stop at a different subject or sentence boundary', () => {
+  for (const text of ['나는 음악을 듣고 너는 춤춘다.', '나는 음악을 듣는다. 춤춘다.']) {
+    const parsed = analyzeSyntax(text);
+    assert.ok(!parsed.edges.some(({ from, to }) => parsed.words[from].token === '나는' && parsed.words[to].token === '춤춘다'));
+  }
+  const parsed = analyzeSyntax('너는 늘 나를 보고 좋은 생각이 난다고 했는데.');
+  assert.ok(!parsed.edges.some(({ from, to }) => parsed.words[from].token === '너는' && parsed.words[to].token === '난다고'));
 });
