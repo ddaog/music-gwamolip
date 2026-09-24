@@ -1,44 +1,120 @@
-// Lightweight bilingual heuristics: relationships are suggestions, not a full parser.
-const verbs = /^(?:am|is|are|was|were|be|feel|feels|love|loves|see|sees|hear|hears|hold|holds|dance|dances|shine|shines|flow|flows|run|runs|walk|walks|sing|sings|breathe|breathes|fall|falls|rise|rises|glow|glows|drift|drifts|touch|touches|wait|waits|move|moves|open|opens|close|closes)$/u;
-const adjectives = /^(?:작은|큰|고요한|따뜻한|차가운|붉은|푸른|밝은|어두운|깊은|높은|느린|빠른|아름다운|부드러운|조용한|warm|cold|tiny|small|big|little|quiet|bright|dark|soft|gentle|red|blue|green|golden|beautiful|silver)$/u;
-const functional = /^(?:a|an|the|and|or|but|to|of|in|on|at|by|for|from|with|through|above|below|under|over|그리고|그러나|또는)$/u;
+// Local, bounded linguistic heuristics. Provisional edges are explicitly marked.
+const set = (text) => new Set(text.split(' '));
+const verbs = set('be have do feel love like see hear hold dance shine flow run walk sing breathe fall rise glow drift touch wait move open close eat watch listen read write draw play make take give go come look speak think know want sleep sit stand fly cross grow carry stop swim help smile laugh work live leave meet dream drink learn follow remember turn bring');
+const irregular = { is:'be', are:'be', am:'be', was:'be', were:'be', been:'be', has:'have', had:'have', does:'do', did:'do', done:'do', went:'go', gone:'go', saw:'see', seen:'see', ate:'eat', eaten:'eat', ran:'run', sang:'sing', sung:'sing', flew:'fly', flown:'fly', drew:'draw', drawn:'draw', wrote:'write', written:'write', made:'make', took:'take', taken:'take', held:'hold', felt:'feel', came:'come', heard:'hear', slept:'sleep', thought:'think', brought:'bring', left:'leave' };
+const auxiliaries = set('am is are was were be been being has have had do does did can could will would shall should may might must');
+const adjectives = set('작은 큰 고요한 따스한 따뜻한 차가운 붉은 푸른 밝은 어두운 깊은 높은 느린 빠른 아름다운 부드러운 조용한 귀여운 예쁜 새로운 오래된 넓은 좁은 맑은 흐린 슬픈 기쁜 행복한 외로운 그리운 따뜻해 warm cold tiny small big little quiet bright dark soft gentle red blue green golden beautiful silver happy sad lonely calm peaceful long short new old warmest coldest softer brighter');
+const determiners = set('a an the this that these those my your our their his her its');
+const prepositions = set('to of in on at by for from with through above below under over beyond beside into behind');
+const conjunctions = set('and or but 그리고 그러나 하지만 또는');
+const koNouns = set('바다 고양이 강아지 나비 바람 나무 하늘 그림 이야기 사고 최고 뒤 아래 위 앞 옆 사이');
+const koVerbStem = /^(?:듣|들었|먹|마시|마셨|보|봐|봤|바라보|바라봤|바라본|좋아|싫어|사랑|그리|그렸|그린|그려|걷|걸|달리|달려|뛰|날아|흐르|흘러|움직|비추|비춰|비춘|만나|만났|기다|웃|울|노래|춤|빛나|반짝|불|분|피|자|잠|읽|쓰|써|건너|건넌|그치|그친|내리|내린|내려|오르|올라|가|오|떠나|멈추|생각|느끼|알|모르|배우|살|죽|잡|놓|만들|되|돼)/u;
+function englishVerb(word) {
+  if (verbs.has(word) || irregular[word]) return true;
+  const forms = [word.replace(/ies$/u, 'y'), word.replace(/(?:es|s)$/u, ''), word.replace(/s$/u, '')];
+  if (/(?:ing|ed)$/u.test(word)) {
+    const stem = word.replace(/(?:ing|ed)$/u, '');
+    forms.push(stem, stem + 'e', stem.replace(/(.)\1$/u, '$1'), stem.replace(/i$/u, 'y'));
+  }
+  return forms.some((form) => verbs.has(form));
+}
+function roleFor(token) {
+  if (conjunctions.has(token)) return 'conjunction';
+  if (determiners.has(token)) return 'determiner';
+  if (prepositions.has(token)) return 'preposition';
+  if (auxiliaries.has(token)) return 'auxiliary';
+  if (adjectives.has(token)) return 'adjective';
+  if (/^[a-z]+$/u.test(token)) {
+    if (englishVerb(token)) return 'predicate';
+    if (/ly$/u.test(token)) return 'adverb';
+    return 'word';
+  }
+  if (koNouns.has(token)) return 'word';
+  if (/(?:하게|히|하게끔)$/u.test(token) || /^(?:빨리|멀리|가만히|매우|아주|살짝)$/u.test(token)) return 'adverb';
+  if (/게$/u.test(token) && !/에게$/u.test(token)) return 'adverb';
+  if (/(?:에서|에게|한테|으로|에)$/u.test(token)) return 'place';
+  if (/[을를]$/u.test(token)) return 'object';
+  if (koVerbStem.test(token) && /(?:는|던|진|친|린|춘|본)$/u.test(token)) return 'participle';
+  if (/(?:다|어요|아요|해요|했어|었어|았어|할게|네요|습니다|습니까|죠)$/u.test(token)
+    || (koVerbStem.test(token) && /(?:고|며|면서|지만|어|아|해|줘|돼|봐|자)$/u.test(token))) return 'predicate';
+  if (/[은는이가]$/u.test(token)) return 'subject';
+  return 'word';
+}
 
 export function analyzeSyntax(text) {
   let clause = 0;
+  let sentence = 0;
   let previousEnd = 0;
   const words = [...text.matchAll(/[가-힣a-z0-9]+/giu)].map((match, index) => {
-    if (/[,.!?;\n]/u.test(text.slice(previousEnd, match.index))) clause += 1;
+    const gap = text.slice(previousEnd, match.index);
+    if (/[,.!?;\n]/u.test(gap)) clause += 1;
+    if (/[.!?\n]/u.test(gap)) sentence += 1;
     const token = match[0].toLowerCase();
-    let role = 'word';
-    if (functional.test(token)) role = 'function';
-    else if (adjectives.test(token)) role = 'adjective';
-    else if (/ly$|(?:게|히)$/u.test(token)) role = 'adverb';
-    else if (verbs.test(token) || /(?:ing|ed)$/u.test(token) || /(?:다|어요|아요|해요|하고|이고|으며|면서)$/u.test(token)) role = 'predicate';
-    else if (/[을를]$/u.test(token)) role = 'object';
-    else if (/[은는이가]$/u.test(token) && /[가-힣]/u.test(token)) role = 'subject';
-    else if (/(?:에서|에게|으로|에)$/u.test(token)) role = 'place';
+    const role = roleFor(token);
     previousEnd = match.index + match[0].length;
-    const result = { token, index, clause, role };
-    if (/[가-힣]/u.test(token) && /(?:하고|이고|으며|면서)$/u.test(token)) clause += 1;
-    return result;
+    const word = { token, index, clause, sentence, role };
+    if (role === 'predicate' && /[가-힣]/u.test(token) && /(?:고|며|면서|지만)$/u.test(token)) clause += 1;
+    return word;
   });
-  const edges = [];
-  const add = (from, to, type) => {
-    if (from !== to && !edges.some((edge) => edge.from === from && edge.to === to)) edges.push({ from, to, type });
-  };
-  for (const word of words) {
-    const group = words.filter((other) => other.clause === word.clause);
-    const nearest = (items) => items.sort((a, b) => Math.abs(a.index - word.index) - Math.abs(b.index - word.index))[0];
-    const predicate = nearest(group.filter((other) => other.role === 'predicate'));
-    if (word.role === 'adjective') {
-      const noun = group.find((other) => other.index > word.index && ['word', 'subject', 'object'].includes(other.role));
-      if (noun) add(word.index, noun.index, 'modifier');
-    } else if (word.role === 'adverb') {
-      if (predicate) add(word.index, predicate.index, 'modifier');
-    } else if (predicate && ['word', 'subject', 'object', 'place'].includes(word.role)) {
-      if (word.role === 'word') word.role = word.index < predicate.index ? 'subject' : 'object';
-      add(word.index, predicate.index, word.role);
+  // Split coordinating clauses only when both sides contain a verb.
+  for (const connector of words.filter((word) => word.role === 'conjunction')) {
+    const group = words.filter((word) => word.clause === connector.clause);
+    if (group.some((word) => word.index < connector.index && word.role === 'predicate')
+      && group.some((word) => word.index > connector.index && word.role === 'predicate')) {
+      for (const word of words) if (word.index > connector.index) word.clause += 1;
     }
+  }
+  const edges = [];
+  const add = (from, to, type, provisional = false) => {
+    if (from !== to && !edges.some((edge) => edge.from === from && edge.to === to))
+      edges.push({ from, to, type, provisional });
+  };
+  const nounRoles = ['word', 'subject', 'object', 'place'];
+  for (const clauseId of new Set(words.map((word) => word.clause))) {
+    const group = words.filter((word) => word.clause === clauseId);
+    const predicates = group.filter((word) => word.role === 'predicate');
+    const heads = predicates.length ? predicates : group.filter((word) => word.role === 'auxiliary');
+    const nearest = (word, items) => [...items].sort((a, b) => Math.abs(a.index - word.index) - Math.abs(b.index - word.index))[0];
+    for (const word of group) {
+      const predicate = nearest(word, heads);
+      if (['adjective', 'participle', 'determiner'].includes(word.role)) {
+        const noun = group.find((other) => other.index > word.index && nounRoles.includes(other.role));
+        if (noun) add(word.index, noun.index, word.role === 'determiner' ? 'determiner' : 'modifier');
+        if (word.role === 'participle') {
+          const subject = [...group].reverse().find((other) => other.index < word.index && other.role === 'subject');
+          if (subject) add(subject.index, word.index, 'subject');
+        }
+      } else if (word.role === 'preposition') {
+        const noun = group.find((other) => other.index > word.index && nounRoles.includes(other.role));
+        if (noun) add(word.index, noun.index, 'place');
+      } else if (word.role === 'auxiliary' && predicate && word !== predicate) {
+        add(word.index, predicate.index, 'auxiliary');
+      } else if (word.role === 'adverb') {
+        if (predicate) add(word.index, predicate.index, 'modifier');
+        else {
+          const head = nearest(word, group.filter((other) => nounRoles.includes(other.role)));
+          if (head) add(word.index, head.index, 'provisional', true);
+        }
+      } else if (predicate && nounRoles.includes(word.role)) {
+        // A relative-clause subject already belongs to its participle.
+        if (edges.some((edge) => edge.from === word.index && words[edge.to].role === 'participle')) continue;
+        const role = word.role === 'word' ? (word.index < predicate.index ? 'subject' : 'object') : word.role;
+        add(word.index, predicate.index, role);
+      }
+    }
+    if (!heads.length) {
+      const nouns = group.filter((word) => nounRoles.includes(word.role));
+      for (let i = 1; i < nouns.length; i += 1) {
+        if (!edges.some((edge) => edge.from === nouns[i - 1].index))
+          add(nouns[i - 1].index, nouns[i].index, 'provisional', true);
+      }
+    }
+  }
+  // Keep the two sides of a compound sentence connected through their verbs.
+  const predicates = words.filter((word) => word.role === 'predicate');
+  for (let i = 1; i < predicates.length; i += 1) {
+    const a = predicates[i - 1], b = predicates[i];
+    if (a.sentence === b.sentence && a.clause !== b.clause) add(a.index, b.index, 'continuation');
   }
   const counts = words.reduce((result, word) => ({ ...result, [word.role]: (result[word.role] ?? 0) + 1 }), {});
   return { words, edges, ...counts };

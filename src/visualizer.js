@@ -196,13 +196,7 @@ export class Visualizer {
 
   clear() {
     const { context: ctx, width, height } = this;
-    const gradient = ctx.createRadialGradient(width * 0.48, height * 0.36, 0, width * 0.5, height * 0.45, width * 0.72);
-    gradient.addColorStop(0, withAlpha(this.palette[0], 0.11));
-    gradient.addColorStop(0.5, 'rgba(232, 233, 230, 0.56)');
-    gradient.addColorStop(1, withAlpha(this.palette[1], 0.015));
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
   }
 
   drawStrings(time, cycle) {
@@ -250,6 +244,7 @@ export class Visualizer {
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(centerX, centerY, baseRadius, 0, TAU);
+    ctx.moveTo(centerX + baseRadius * 0.62, centerY);
     ctx.arc(centerX, centerY, baseRadius * 0.62, 0, TAU);
     ctx.stroke();
     ctx.strokeStyle = 'rgba(232, 102, 61, .72)';
@@ -419,75 +414,62 @@ export class Visualizer {
 
   drawGraphs(time) {
     const { context: ctx, width, height, analysis } = this;
-    const gap = 22;
-    const margin = width * 0.08;
-    const panelWidth = (width - margin * 2 - gap) / 2;
-    const panelHeight = Math.min(112, height * 0.18);
-    const y = height - panelHeight - 30;
-    const profiles = [this.profiles[0], this.profiles[2]];
-    const labels = ['원경 EQ · BASS', '근경 EQ · TOPLINE'];
-    const bandNames = ['LOW', 'MID', 'AIR'];
-    const bandCenters = [0.16, 0.5, 0.84];
-
+    this.graphAxes ??= { ...analysis.axes };
+    for (const axis of Object.keys(analysis.axes)) {
+      this.graphAxes[axis] += (analysis.axes[axis] - this.graphAxes[axis]) * (this.reducedMotion ? 1 : .08);
+    }
+    const axes = this.graphAxes;
+    const stacked = width < 480;
+    const margin = 12, gap = 16, panelHeight = 144;
+    const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap) / 2;
+    const top = height - (stacked ? panelHeight * 2 + gap : panelHeight) - 12;
     for (let panel = 0; panel < 2; panel += 1) {
-      const x = margin + panel * (panelWidth + gap);
-      const profile = profiles[panel];
-      const traits = panel === 0
-        ? [0.62 + analysis.axes.warmth * 0.25, 0.28 + analysis.axes.space * 0.25, 0.13 + analysis.axes.light * 0.14]
-        : [0.18 + analysis.axes.tension * 0.16, 0.43 + analysis.axes.motion * 0.28, 0.52 + analysis.axes.light * 0.28];
-      const plotTop = y + 17;
-      const plotBottom = y + panelHeight - 22;
-      const plotHeight = plotBottom - plotTop;
+      const x = margin + (stacked ? 0 : panel * (panelWidth + gap));
+      const y = top + (stacked ? panel * (panelHeight + gap) : 0);
+      const ink = panel ? '#c97855' : '#668c86';
+      const gains = panel
+        ? [.15 + axes.tension * .15, .35 + axes.motion * .28, .4 + axes.light * .3]
+        : [.5 + axes.warmth * .25, .23 + axes.space * .25, .1 + axes.light * .16];
+      const left = x + 18, right = x + panelWidth - 18;
+      const plotTop = y + 42, bottom = y + panelHeight - 26;
+      const response = (t) => clamp(gains.reduce((sum, value, i) => {
+        const distance = (t - [.13, .5, .87][i]) / .22;
+        return sum + value * Math.exp(-.5 * distance * distance);
+      }, .04), .02, .96);
       ctx.save();
-      ctx.fillStyle = 'rgba(248, 249, 247, .82)';
-      ctx.fillRect(x, y, panelWidth, panelHeight);
-      ctx.strokeStyle = 'rgba(50, 54, 56, 0.22)';
-      ctx.lineWidth = 0.8;
-      ctx.strokeRect(x, y, panelWidth, panelHeight);
-      for (let band = 0; band < 3; band += 1) {
-        const bandX = x + (panelWidth * band) / 3;
-        const bandWidth = panelWidth / 3;
-        ctx.fillStyle = `rgba(72, 78, 80, ${0.012 + traits[band] * 0.018})`;
-        ctx.fillRect(bandX, plotTop, bandWidth, plotHeight);
-        if (band > 0) {
-          ctx.strokeStyle = 'rgba(50, 54, 56, .12)';
-          ctx.beginPath(); ctx.moveTo(bandX, plotTop); ctx.lineTo(bandX, plotBottom); ctx.stroke();
-        }
-        ctx.fillStyle = 'rgba(50, 54, 56, .55)';
-        ctx.font = '7px ui-monospace, SFMono-Regular, Menlo, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(bandNames[band], bandX + bandWidth / 2, y + 11);
-      }
-      const curveColor = panel === 0 ? '#596164' : '#e8663d';
-      ctx.strokeStyle = curveColor;
-      ctx.lineWidth = 1.6;
-      ctx.shadowBlur = 0;
-      const responseAt = (progress) => {
-        const animated = this.playing && !this.reducedMotion ? Math.sin(time * .003 + progress * 4) * .025 : 0;
-        const response = traits.reduce((sum, gain, index) => {
-          const distance = (progress - bandCenters[index]) / (index === 1 ? .2 : .16);
-          return sum + gain * Math.exp(-.5 * distance * distance);
-        }, .06) + animated;
-        return clamp(response, .04, 1);
-      };
-      const points = 64;
       ctx.beginPath();
-      for (let index = 0; index <= points; index += 1) {
-        const progress = index / points;
-        const px = x + progress * panelWidth;
-        const py = plotBottom - responseAt(progress) * plotHeight;
-        if (index === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      ctx.roundRect(x, y, panelWidth, panelHeight, 10);
+      ctx.fillStyle = '#eff1ed'; ctx.fill();
+      ctx.strokeStyle = '#d0d5ce'; ctx.lineWidth = .8; ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.font = '500 11px ui-monospace, monospace';
+      ctx.fillStyle = ink;
+      ctx.fillText(panel ? '근경 / MELODY' : '원경 / BASS', left, y + 24);
+      ctx.textAlign = 'right'; ctx.font = '8px ui-monospace, monospace';
+      ctx.fillStyle = '#929b92'; ctx.fillText('TONE', right, y + 24);
+      for (let i = 0; i < 3; i += 1) {
+        const px = left + (right - left) * (i / 2);
+        ctx.strokeStyle = '#dde2d9'; ctx.lineWidth = .7;
+        ctx.beginPath(); ctx.moveTo(px, plotTop); ctx.lineTo(px, bottom); ctx.stroke();
+        ctx.textAlign = i === 0 ? 'left' : i === 2 ? 'right' : 'center';
+        ctx.fillStyle = '#9aa296'; ctx.fillText(['LOW', 'MID', 'AIR'][i], px, bottom + 15);
       }
-      ctx.stroke();
-      const playX = x + this.getCycle(time) * panelWidth;
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(232, 102, 61, .5)';
-      ctx.beginPath(); ctx.moveTo(playX, plotTop); ctx.lineTo(playX, plotBottom); ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = curveColor;
-      ctx.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
-      ctx.fillText(labels[panel], x + 10, y + panelHeight - 11);
+      const points = Array.from({ length: 65 }, (_, i) => [
+        left + (right - left) * i / 64,
+        bottom - response(i / 64) * (bottom - plotTop),
+      ]);
+      const wash = ctx.createLinearGradient(0, plotTop, 0, bottom);
+      wash.addColorStop(0, withAlpha(ink, .17)); wash.addColorStop(1, withAlpha(ink, .01));
+      ctx.beginPath(); ctx.moveTo(left, bottom);
+      points.forEach(([px, py]) => ctx.lineTo(px, py));
+      ctx.lineTo(right, bottom); ctx.closePath(); ctx.fillStyle = wash; ctx.fill();
+      ctx.beginPath(); points.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+      ctx.strokeStyle = ink; ctx.lineWidth = 1.7; ctx.stroke();
+      if (this.playing) {
+        const t = this.getCycle(time);
+        const px = left + (right - left) * t, py = bottom - response(t) * (bottom - plotTop);
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, TAU); ctx.fillStyle = ink; ctx.fill();
+      }
       ctx.restore();
     }
   }

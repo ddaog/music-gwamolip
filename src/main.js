@@ -1,5 +1,6 @@
 import './styles.css';
 import { analyzeSyntax } from './syntax.js';
+import { renderLiveCode } from './live-code.js';
 import { analyzeText, describeAnalysis } from './text-analyzer.js';
 import { LEXICON_STATS } from './lexicon.js';
 import { createArrangement, createStrudelCode, MusicEngine } from './music-engine.js';
@@ -56,6 +57,32 @@ let updateTimer;
 let audioTask = null;
 let audioRevision = 0;
 let autoPlayEnabled = true;
+let relationFrame;
+let composing = false;
+
+function syncEditorLayout() {
+  const input = elements.sentence;
+  const previousScroll = input.scrollTop;
+  input.style.height = '0px';
+  input.style.height = `${Math.min(360, Math.max(156, input.scrollHeight))}px`;
+  input.style.overflowY = input.scrollHeight > input.clientHeight ? 'auto' : 'hidden';
+  input.scrollTop = previousScroll;
+  const mirror = elements.sentenceHighlight;
+  mirror.style.width = `${input.clientWidth}px`;
+  mirror.style.height = `${input.clientHeight}px`;
+  mirror.style.left = `${input.offsetLeft}px`;
+  mirror.style.top = `${input.offsetTop}px`;
+  mirror.scrollTop = input.scrollTop;
+  mirror.scrollLeft = input.scrollLeft;
+}
+
+function scheduleRelations() {
+  cancelAnimationFrame(relationFrame);
+  relationFrame = requestAnimationFrame(() => {
+    elements.sentenceHighlight.scrollTop = elements.sentence.scrollTop;
+    renderRelations([...elements.sentenceHighlight.querySelectorAll('.word-token')]);
+  });
+}
 
 function metricNumber(value) {
   return Math.round(value * 100);
@@ -97,6 +124,8 @@ function renderAnalysis() {
   elements.farWords.textContent = analysis.layers.farTokens.join(' · ');
   elements.nearWords.textContent = analysis.layers.nearTokens.join(' · ');
   elements.code.textContent = code;
+  renderLiveCode(document.querySelector('#live-code'), elements.sentence.value.trim() ? code : '');
+  document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? '입력 반영 중' : '대기';
   renderWordHighlight();
   visualizer.setAnalysis(analysis);
 }
@@ -109,12 +138,6 @@ function renderWordHighlight() {
   host.replaceChildren();
   let cursor = 0;
   let tokenIndex = 0;
-  const wordNodes = [];
-  elements.sentence.style.height = 'auto';
-  const fieldHeight = Math.min(360, Math.max(156, elements.sentence.scrollHeight));
-  elements.sentence.style.height = `${fieldHeight}px`;
-  elements.sentence.parentElement.style.height = `${fieldHeight}px`;
-  elements.sentence.style.overflowY = elements.sentence.scrollHeight > 360 ? 'auto' : 'hidden';
   for (const match of text.matchAll(tokenRegex)) {
     const start = match.index;
     if (start > cursor) host.append(document.createTextNode(text.slice(cursor, start)));
@@ -135,13 +158,13 @@ function renderWordHighlight() {
     word.style.setProperty('--word-delay', `${-(tokenIndex % 7) * 0.23}s`);
     word.textContent = match[0];
     host.append(word);
-    wordNodes.push(word);
     cursor = start + match[0].length;
     tokenIndex += 1;
   }
   if (cursor < text.length) host.append(document.createTextNode(text.slice(cursor)));
-  if (!text) host.append(document.createTextNode(' '));
-  requestAnimationFrame(() => renderRelations(wordNodes));
+  if (!text || text.endsWith('\n')) host.append(document.createTextNode('\u200b'));
+  syncEditorLayout();
+  scheduleRelations();
 }
 
 
@@ -151,8 +174,9 @@ function renderRelations(wordNodes) {
   svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
   svg.replaceChildren();
   if (wordNodes.length < 2) return;
-  const sources = analysis.syntax.edges.map(({ from, to }) => [from, to]);
-  for (const [from, to] of sources) {
+  const sources = analysis.syntax.edges;
+  for (const { from, to, provisional } of sources) {
+    if (!wordNodes[from]?.isConnected || !wordNodes[to]?.isConnected) continue;
     const a = wordNodes[from].getClientRects()[0] ?? wordNodes[from].getBoundingClientRect();
     const b = wordNodes[to].getClientRects()[0] ?? wordNodes[to].getBoundingClientRect();
     const x1 = a.left + a.width / 2 - rect.left;
@@ -164,6 +188,7 @@ function renderRelations(wordNodes) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${lift} ${x2} ${y2}`);
     path.setAttribute('class', 'relation-path');
+    if (provisional) path.classList.add('is-provisional');
     svg.append(path);
     for (const [x, y] of [[x1, y1], [x2, y2]]) {
       const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -191,6 +216,7 @@ function updatePlaybackStatus() {
   elements.playButton.classList.toggle('is-playing', engine.playing);
   elements.actionLabel.textContent = engine.playing ? '소리 멈추기' : '문장을 연주하기';
   elements.engineLabel.textContent = engine.playing ? 'sound awake' : 'sound asleep';
+  document.querySelector('#code-state').textContent = engine.playing ? '연주 중' : '대기';
 }
 
 function stopPlayback(message = '연주를 멈췄어요. 문장을 바꾸거나 다시 시작해보세요.') {
@@ -264,8 +290,8 @@ elements.sentence.addEventListener('focus', () => {
 
 elements.sentence.addEventListener('input', (event) => {
   elements.charCount.textContent = elements.sentence.value.length;
+  if (event.isComposing || composing) { syncEditorLayout(); return; }
   analyzeCurrentText();
-  if (event.isComposing) return;
   if (!elements.sentence.value.trim()) {
     window.clearTimeout(updateTimer);
     stopPlayback('문장을 입력하세요.');
@@ -279,8 +305,16 @@ elements.sentence.addEventListener('input', (event) => {
   }, 560);
 });
 
-elements.sentence.addEventListener('compositionstart', () => window.clearTimeout(updateTimer));
-elements.sentence.addEventListener('compositionend', () => elements.sentence.dispatchEvent(new Event('input')));
+elements.sentence.addEventListener('compositionstart', () => {
+  composing = true;
+  window.clearTimeout(updateTimer);
+  elements.sentence.parentElement.classList.add('is-composing');
+});
+elements.sentence.addEventListener('compositionend', () => {
+  composing = false;
+  elements.sentence.parentElement.classList.remove('is-composing');
+  elements.sentence.dispatchEvent(new Event('input'));
+});
 
 elements.sentence.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -342,9 +376,14 @@ window.addEventListener('formyiru:cycle', (event) => {
   elements.cycleValue.textContent = event.detail.toFixed(2).padStart(5, '0');
 });
 
-window.addEventListener('resize', () => requestAnimationFrame(() => renderRelations(
-  [...elements.sentenceHighlight.querySelectorAll('.word-token')],
-)));
+let editorWidth = 0;
+new ResizeObserver(([entry]) => {
+  if (Math.abs(entry.contentRect.width - editorWidth) < .5) return;
+  editorWidth = entry.contentRect.width;
+  syncEditorLayout();
+  scheduleRelations();
+}).observe(elements.sentence.parentElement);
+document.fonts.ready.then(() => { syncEditorLayout(); scheduleRelations(); });
 
 window.addEventListener('pagehide', () => engine.stop());
 
