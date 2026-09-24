@@ -63,3 +63,23 @@ test('additional words gradually increase the arrangement layers', () => {
   assert.ok(totalGain(layered) > totalGain(sparse) * 2);
   assert.equal(layeredAnalysis.root, sparseAnalysis.root);
 });
+
+test('common Korean and English inflections resolve to their imagery', () => {
+  const korean = analyzeText('아름다운 밤에 따뜻해');
+  const english = analyzeText('The moon is shining beautifully.');
+  assert.ok(korean.concepts.some((item) => item.id === 'love'));
+  assert.ok(korean.concepts.some((item) => item.id === 'moon'));
+  assert.ok(english.concepts.some((item) => item.id === 'moon'));
+  assert.ok(english.concepts.some((item) => item.id === 'light'));
+  assert.ok(english.concepts.some((item) => item.id === 'love'));
+});
+
+test('unlisted words still receive individual sound and color traits', () => {
+  const analysis = analyzeText('florp glindle');
+  const [first, second] = analysis.tokenMeanings;
+  assert.notDeepEqual(first.traits, second.traits);
+  assert.notEqual(
+    visualProfileForToken(first.primaryConcept, first.token, first.traits).color,
+    visualProfileForToken(second.primaryConcept, second.token, second.traits).color,
+  );
+});

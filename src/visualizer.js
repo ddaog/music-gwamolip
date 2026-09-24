@@ -3,9 +3,9 @@ const COLORS = {
   red: '#ef5b53',
   green: '#63c53e',
   blue: '#4b8cde',
-  ink: '#17161d',
-  paper: '#e9e5dc',
-  grid: 'rgba(232, 229, 220, 0.18)',
+  ink: '#e6e7e3',
+  paper: '#4f5355',
+  grid: 'rgba(54, 58, 60, 0.17)',
 };
 
 const VISUAL_PROFILES = {
@@ -51,8 +51,25 @@ export function visualProfileFor(id) {
   return VISUAL_PROFILES[id] ?? VISUAL_PROFILES.unique;
 }
 
-export function visualProfileForToken(id, token = '') {
+export function visualProfileForToken(id, token = '', traits = {}) {
   const base = visualProfileFor(id);
+  if (id === 'unique' && token) {
+    const hash = [...token].reduce((value, character, index) => Math.imul(value ^ character.codePointAt(0), 16777619) + index, 2166136261) >>> 0;
+    const light = Math.max(0, Math.min(1, traits.light ?? 0.5));
+    const softness = Math.max(0, Math.min(1, traits.softness ?? 0.5));
+    const motion = Math.max(0, Math.min(1, traits.motion ?? 0.5));
+    const tension = Math.max(0, Math.min(1, traits.tension ?? 0.5));
+    const hue = hash % 360;
+    const saturation = Math.round(48 + (1 - softness) * 24 + tension * 9);
+    const luminance = Math.round(42 + light * 25);
+    const effect = tension > 0.64 ? 'jitter' : motion > 0.64 ? 'wave' : light > 0.62 ? 'spark' : softness > 0.58 ? 'haze' : 'orbit';
+    return {
+      color: `hsl(${hue} ${saturation}% ${luminance}%)`,
+      accent: `hsl(${(hue + 34) % 360} ${Math.min(90, saturation + 10)}% ${Math.min(84, luminance + 18)}%)`,
+      effect,
+      shape: 'circle',
+    };
+  }
   if (id !== 'color') return base;
   const text = token.toLowerCase();
   const shades = [
@@ -145,6 +162,7 @@ export class Visualizer {
       ...visualProfileForToken(
         analysis.tokenMeanings[index % analysis.tokenMeanings.length]?.primaryConcept,
         analysis.tokenMeanings[index % analysis.tokenMeanings.length]?.token,
+        analysis.tokenMeanings[index % analysis.tokenMeanings.length]?.traits,
       ),
       token: analysis.tokenMeanings[index % analysis.tokenMeanings.length]?.token,
       angle: random() * TAU,
@@ -180,7 +198,7 @@ export class Visualizer {
     const { context: ctx, width, height } = this;
     const gradient = ctx.createRadialGradient(width * 0.48, height * 0.36, 0, width * 0.5, height * 0.45, width * 0.72);
     gradient.addColorStop(0, withAlpha(this.palette[0], 0.11));
-    gradient.addColorStop(0.5, 'rgba(25, 24, 31, 0.35)');
+    gradient.addColorStop(0.5, 'rgba(232, 233, 230, 0.56)');
     gradient.addColorStop(1, withAlpha(this.palette[1], 0.015));
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = gradient;
@@ -199,7 +217,7 @@ export class Visualizer {
     ctx.lineWidth = 1;
     for (let row = 0; row < 3; row += 1) {
       const y = top + row * 28;
-      ctx.strokeStyle = 'rgba(235, 232, 224, 0.13)';
+      ctx.strokeStyle = 'rgba(64, 68, 70, 0.13)';
       ctx.beginPath();
       ctx.moveTo(left, y);
       ctx.lineTo(right, y);
@@ -224,60 +242,36 @@ export class Visualizer {
 
   drawOrbit(time, cycle) {
     const { context: ctx, width, height, analysis } = this;
-    const graphHeight = Math.min(155, height * 0.24);
-    const availableHeight = height - graphHeight - 110;
-    const centerX = width * (width > 640 ? 0.54 : 0.5);
-    const centerY = 116 + availableHeight * 0.53;
-    const baseRadius = Math.min(width * 0.32, availableHeight * 0.42);
-    const pointerPullX = this.pointer.active ? (this.pointer.x - 0.5) * 18 : 0;
-    const pointerPullY = this.pointer.active ? (this.pointer.y - 0.5) * 14 : 0;
-
-    this.drawMotifs(time, centerX, centerY, baseRadius);
+    const centerX = width / 2;
+    const baseRadius = Math.min(width * 0.19, height * 0.29);
+    const centerY = baseRadius + 16;
     ctx.save();
     ctx.strokeStyle = COLORS.grid;
-    ctx.lineWidth = 1.2;
-    for (let ring = 1; ring <= 4; ring += 1) {
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, baseRadius, 0, TAU);
+    ctx.arc(centerX, centerY, baseRadius * 0.62, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(232, 102, 61, .72)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, baseRadius, -Math.PI / 2, -Math.PI / 2 + cycle * TAU);
+    ctx.stroke();
+    const words = analysis.tokenMeanings.slice(0, 12);
+    words.forEach((meaning, index) => {
+      const angle = -Math.PI / 2 + (index / Math.max(1, words.length)) * TAU + (this.playing ? cycle * .12 : 0);
+      const radius = meaning.layer === 'far' ? baseRadius * .8 : baseRadius * .5;
+      const profile = visualProfileForToken(meaning.primaryConcept, meaning.token, meaning.traits);
+      ctx.fillStyle = profile.color;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, (baseRadius * ring) / 4, 0, TAU);
-      ctx.stroke();
-    }
-
+      ctx.arc(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius, meaning.layer === 'far' ? 2.6 : 3.4, 0, TAU);
+      ctx.fill();
+    });
+    ctx.fillStyle = '#e8663d';
     ctx.beginPath();
-    ctx.moveTo(centerX - baseRadius, centerY);
-    ctx.lineTo(centerX + baseRadius, centerY);
-    ctx.moveTo(centerX, centerY - baseRadius);
-    ctx.lineTo(centerX, centerY + baseRadius);
-    ctx.stroke();
-
-    const playAngle = -Math.PI / 2 + cycle * TAU;
-    ctx.strokeStyle = 'rgba(241, 238, 231, 0.82)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.lineTo(centerX + Math.cos(playAngle) * baseRadius, centerY + Math.sin(playAngle) * baseRadius);
-    ctx.stroke();
-    ctx.fillStyle = COLORS.paper;
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, 3.5, 0, TAU);
+    ctx.arc(centerX, centerY, 3, 0, TAU);
     ctx.fill();
-
-    for (const particle of this.particles) {
-      const motion = this.reducedMotion ? 0 : time * 0.0002 * particle.speed * (0.4 + analysis.axes.motion);
-      const angle = particle.angle + motion;
-      const radius = baseRadius * particle.orbit * 0.76;
-      const x = centerX + Math.cos(angle) * radius;
-      const y = centerY + Math.sin(angle) * radius;
-      const pulse = particle.token === this.focusToken ? 1 : this.playing ? 0.5 + Math.sin((cycle + particle.offset) * TAU * 2) * 0.5 : 0.25;
-      ctx.globalAlpha = 0.2 + pulse * 0.45;
-      ctx.fillStyle = particle.color;
-      ctx.shadowColor = particle.color;
-      ctx.shadowBlur = 4 + pulse * 10;
-      this.drawParticle(ctx, particle, x, y, particle.size + pulse * 1.6, angle);
-    }
     ctx.restore();
-
-    this.drawCore(time, centerX + pointerPullX, centerY + pointerPullY, baseRadius);
-    this.drawLabels(centerX, centerY, baseRadius);
   }
 
   drawParticle(ctx, particle, x, y, size, angle) {
@@ -404,7 +398,7 @@ export class Visualizer {
     ctx.textAlign = 'center';
     const drawToken = (token, index, layer) => {
       const meaning = analysis.tokenMeanings.find((item) => item.token === token);
-      const profile = visualProfileForToken(meaning?.primaryConcept, token);
+      const profile = visualProfileForToken(meaning?.primaryConcept, token, meaning?.traits);
       const angle = -Math.PI * 0.9 + index * 0.6;
       const layerAngle = layer === 'far' ? angle : Math.PI * 0.28 + index * 0.72;
       const radius = layer === 'far' ? baseRadius * (0.78 + (index % 2) * 0.12) : baseRadius * 0.34;
@@ -445,29 +439,29 @@ export class Visualizer {
       const plotBottom = y + panelHeight - 22;
       const plotHeight = plotBottom - plotTop;
       ctx.save();
-      ctx.fillStyle = 'rgba(12, 11, 16, .34)';
+      ctx.fillStyle = 'rgba(248, 249, 247, .82)';
       ctx.fillRect(x, y, panelWidth, panelHeight);
-      ctx.strokeStyle = 'rgba(235, 232, 224, 0.32)';
+      ctx.strokeStyle = 'rgba(50, 54, 56, 0.22)';
       ctx.lineWidth = 0.8;
       ctx.strokeRect(x, y, panelWidth, panelHeight);
       for (let band = 0; band < 3; band += 1) {
         const bandX = x + (panelWidth * band) / 3;
         const bandWidth = panelWidth / 3;
-        ctx.fillStyle = withAlpha(profile.color, 0.025 + traits[band] * 0.025);
+        ctx.fillStyle = `rgba(72, 78, 80, ${0.012 + traits[band] * 0.018})`;
         ctx.fillRect(bandX, plotTop, bandWidth, plotHeight);
         if (band > 0) {
-          ctx.strokeStyle = 'rgba(235, 232, 224, .13)';
+          ctx.strokeStyle = 'rgba(50, 54, 56, .12)';
           ctx.beginPath(); ctx.moveTo(bandX, plotTop); ctx.lineTo(bandX, plotBottom); ctx.stroke();
         }
-        ctx.fillStyle = 'rgba(235, 232, 224, .36)';
+        ctx.fillStyle = 'rgba(50, 54, 56, .55)';
         ctx.font = '7px ui-monospace, SFMono-Regular, Menlo, monospace';
         ctx.textAlign = 'center';
         ctx.fillText(bandNames[band], bandX + bandWidth / 2, y + 11);
       }
-      ctx.strokeStyle = withAlpha(profile.color, .9);
-      ctx.lineWidth = 1.8;
-      ctx.shadowColor = profile.color;
-      ctx.shadowBlur = 8;
+      const curveColor = panel === 0 ? '#596164' : '#e8663d';
+      ctx.strokeStyle = curveColor;
+      ctx.lineWidth = 1.6;
+      ctx.shadowBlur = 0;
       const responseAt = (progress) => {
         const animated = this.playing && !this.reducedMotion ? Math.sin(time * .003 + progress * 4) * .025 : 0;
         const response = traits.reduce((sum, gain, index) => {
@@ -488,10 +482,10 @@ export class Visualizer {
       ctx.stroke();
       const playX = x + this.getCycle(time) * panelWidth;
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = withAlpha(profile.accent, .65);
+      ctx.strokeStyle = 'rgba(232, 102, 61, .5)';
       ctx.beginPath(); ctx.moveTo(playX, plotTop); ctx.lineTo(playX, plotBottom); ctx.stroke();
       ctx.shadowBlur = 0;
-      ctx.fillStyle = profile.accent;
+      ctx.fillStyle = curveColor;
       ctx.font = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
       ctx.fillText(labels[panel], x + 10, y + panelHeight - 11);
       ctx.restore();
@@ -520,7 +514,6 @@ export class Visualizer {
     }
     const cycle = this.getCycle(now);
     this.clear();
-    this.drawStrings(now, cycle);
     this.drawOrbit(now, cycle);
     this.drawGraphs(now);
     this.drawRipples(now);

@@ -1124,3 +1124,99 @@ footer p:first-child { opacity: 0; }
   .micro-dial__knob::after { left: 8px; top: 2px; }
   .micro-dial small { font-size: 6px; }
 }
+
+/* Hardware-inspired, quiet neutral palette */
+:root {
+  color-scheme: light;
+  --bg: #e7e8e5;
+  --bg-deep: #d9dad7;
+  --surface: #f1f2f0;
+  --surface-soft: #dedfdd;
+  --line: rgba(39, 41, 43, .12);
+  --line-strong: rgba(39, 41, 43, .24);
+  --text: #282a2d;
+  --muted: #74787b;
+  --red: #e8663d;
+  --green: #84948d;
+  --blue: #788994;
+}
+
+body { background: var(--bg); color: var(--text); }
+.site-header { border-bottom-color: var(--line); }
+.brand { color: #25272a; }
+.brand-mark i { animation: none; }
+.brand-mark i:nth-child(1) { background: #e8663d; }
+.brand-mark i:nth-child(2) { background: #a4aaa6; }
+.brand-mark i:nth-child(3) { background: #70777a; }
+.project-meta { color: #6e7274; }
+.status-dot { background: #e8663d; box-shadow: none; }
+
+.text-field-wrap {
+  padding: 5px;
+  border: 1px solid #c9cbc8;
+  border-radius: 13px;
+  background: #dfe0dd;
+  box-shadow: inset 0 1px 2px rgba(33, 35, 37, .05), 0 2px 4px rgba(33, 35, 37, .035);
+}
+
+textarea {
+  border-color: transparent;
+  border-radius: 9px;
+}
+
+.text-field-wrap textarea:hover,
+.text-field-wrap textarea:focus {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.word-token {
+  text-shadow: none;
+  font-weight: 500;
+  animation: none;
+  color: color-mix(in srgb, var(--word-color) 64%, #25272a);
+}
+
+.word-token::before { display: none; content: none; }
+.relation-path { stroke: rgba(65, 69, 71, .45); stroke-dasharray: none; }
+.visual-panel::after { display: none; }
+.visual-heading strong { color: #4b4e51; }
+.cycle-readout { color: #53575a; }
+
+.prompt-chip {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  color: #777a7c;
+}
+
+.prompt-chip:hover { background: rgba(255, 255, 255, .5); color: #282a2d; transform: none; }
+.primary-action { background: #303236; color: #f2f2ef; }
+.primary-action:hover:not(:disabled) { background: #484b4e; transform: none; }
+.secondary-action { border-color: #c4c7c4; color: #515558; }
+.secondary-action:hover { background: rgba(255, 255, 255, .45); transform: none; }
+.secondary-action span { color: #e8663d; }
+.reading-trigger { color: #777a7c; }
+.reading-trigger:hover { color: #292b2e; border-color: #e8663d; }
+
+.visual-caption { border-color: var(--line); }
+.micro-dial { gap: 7px; color: #53575a; }
+.micro-dial__knob {
+  width: 24px;
+  height: 24px;
+  border-color: #c4c7c4;
+  background: linear-gradient(145deg, #fafaf8, #c9cbc8 74%);
+  box-shadow: 0 1px 2px rgba(32, 34, 35, .16), inset 0 0 0 2px rgba(255, 255, 255, .55);
+}
+.micro-dial__knob::after { left: 10px; top: 2px; width: 3px; height: 6px; box-shadow: none; }
+.micro-dial small { color: #7d8183; }
+.micro-dial b { color: #323538; }
+footer { color: #85898a; }
+
+@media (max-width: 560px) {
+  .text-field-wrap { padding: 4px; }
+  .micro-dial { gap: 4px; }
+  .micro-dial__knob { width: 19px; height: 19px; }
+  .micro-dial__knob::after { left: 8px; }
+}

@@ -105,7 +105,6 @@ function renderWordHighlight() {
   let cursor = 0;
   let tokenIndex = 0;
   const wordNodes = [];
-  const rawWords = [];
   elements.sentence.style.height = 'auto';
   const fieldHeight = Math.min(360, Math.max(156, elements.sentence.scrollHeight));
   elements.sentence.style.height = `${fieldHeight}px`;
@@ -117,14 +116,13 @@ function renderWordHighlight() {
     const word = document.createElement('span');
     const rawToken = match[0].toLowerCase();
     const meaning = tokens.get(rawToken) ?? { token: rawToken, primaryConcept: 'unique', layer: 'near', traits: {} };
-    const profile = visualProfileForToken(meaning?.primaryConcept, meaning?.token ?? match[0]);
+    const profile = visualProfileForToken(meaning?.primaryConcept, meaning?.token ?? match[0], meaning?.traits);
     word.className = 'word-token';
     word.dataset.effect = profile.effect;
     word.dataset.layer = meaning?.layer ?? 'near';
     word.dataset.token = meaning.token;
     const role = grammaticalRole(rawToken, tokenIndex, text);
     word.dataset.role = role;
-    word.dataset.roleLabel = ({ subject: '주어', predicate: '서술', object: '목적', adjective: '형용', adverb: '부사', word: '단어' })[role];
     word.style.setProperty('--word-color', profile.color);
     word.style.setProperty('--word-accent', profile.accent);
     word.style.setProperty('--word-glow', `${Math.round(5 + ((meaning.traits.light ?? 0) + 0.4) * 18)}px`);
@@ -133,7 +131,6 @@ function renderWordHighlight() {
     word.textContent = match[0];
     host.append(word);
     wordNodes.push(word);
-    rawWords.push(rawToken);
     cursor = start + match[0].length;
     tokenIndex += 1;
   }
@@ -176,10 +173,10 @@ function renderRelations(wordNodes) {
   const subject = roles.indexOf('subject');
   const object = roles.indexOf('object');
   const modifier = roles.findIndex((role) => role === 'adjective' || role === 'adverb');
-  if (subject >= 0 && subject !== predicate) sources.push([subject, predicate, '주어·서술어']);
-  if (object >= 0 && object !== predicate) sources.push([object, predicate, '목적어·서술어']);
-  if (modifier >= 0) sources.push([modifier, Math.min(modifier + 1, wordNodes.length - 1), roles[modifier] === 'adverb' ? '수식' : '꾸밈']);
-  for (const [from, to, label] of sources) {
+  if (subject >= 0 && subject !== predicate) sources.push([subject, predicate]);
+  if (object >= 0 && object !== predicate) sources.push([object, predicate]);
+  if (modifier >= 0) sources.push([modifier, Math.min(modifier + 1, wordNodes.length - 1)]);
+  for (const [from, to] of sources) {
     const a = wordNodes[from].getBoundingClientRect();
     const b = wordNodes[to].getBoundingClientRect();
     const x1 = a.left + a.width / 2 - rect.left;
