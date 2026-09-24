@@ -10,8 +10,13 @@ export function codeLayers(source) {
 }
 export function visiblePatternCode(source) {
   const patterns = source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line))
-    .map((line) => line.match(/^\s*((?:n|note|s)\("[^"\n]*"\))/u)?.[1]).filter(Boolean);
-  return patterns.length ? ['stack(', ...patterns.map((pattern, index) => `  ${pattern}${index < patterns.length - 1 ? ',' : ''}`), ')'] : ['// 첫 단어를 기다리는 중'];
+    .map((line) => {
+      const pattern = line.match(/^\s*((?:n|note|s)\("[^"\n]*"\))/u)?.[1];
+      const module = line.match(/\/\* (M\d+):/u)?.[1];
+      return pattern ? `${module ? `/* ${module} */ ` : ''}${pattern}` : null;
+    }).filter(Boolean);
+  const patches = source.split('\n').filter((line) => line.startsWith('// PATCH '));
+  return patterns.length ? [...patches, 'stack(', ...patterns.map((pattern, index) => `  ${pattern}${index < patterns.length - 1 ? ',' : ''}`), ')'] : ['// 첫 단어를 기다리는 중'];
 }
 export function renderLiveCode(host, source) {
   const layers = codeLayers(source);

@@ -52,13 +52,14 @@
                 <button id="variation-button" class="secondary-action" type="button">
                   <span aria-hidden="true">↝</span> 변주
                 </button>
+                <button id="semantic-indicator" class="semantic-indicator" type="button" aria-label="의미 확장 켜기" aria-pressed="false"><span aria-hidden="true">✦</span><span id="semantic-summary" role="status">의미 확장</span></button>
               </div>
               <p class="status-line" id="status-line" aria-live="polite"> </p>
               <details class="instrument-settings">
                 <summary>비트 · 가이드</summary>
                 <div class="semantic-controls">
                   <label><input id="semantic-enabled" type="checkbox" /> 의미 확장 · 기기 내 AI</label>
-                  <small>첫 모델 다운로드 약 120MB + 실행 파일. 입력 문장은 전송하지 않습니다.</small>
+                  <small>첫 방문에 약 120MB + 실행 파일을 준비하고 자동 적용합니다. 입력 문장은 전송하지 않습니다. 끄면 다음 방문에도 자동 다운로드하지 않습니다.</small>
                   <span id="semantic-status" role="status">사전 모드</span>
                 </div>
                 <div class="prompt-row" aria-label="예시 문장">
@@ -81,6 +82,8 @@
                 <button type="button" data-prompt="A tiny red bird dances softly.">A tiny red bird dances softly.</button>
                 <p>BEAT를 ‘켜기’로 바꾸면 짧은 글에도 리듬이 생깁니다. 슬라이더는 드럼의 강도입니다. ‘자동’에서는 단어 수에 따라 드럼이 쌓입니다.</p>
                 <p>변주로 같은 문장의 다른 선율을 들어보세요. 단어 연결은 한국어·영어 규칙으로 추정하며, 사전에 없는 말은 글자와 발음 특성으로 반응합니다.</p>
+                <p>문장을 더하면 작은 신스 모듈이 쌓입니다. 각 문장은 음원 → 필터 → 앰프로 소리를 만듭니다. 초록 케이블은 앞 문장의 LFO로 뒤 문장의 필터를 움직이고, 주황 케이블은 반복 단어로 발음 타이밍을 공유합니다. 보라 케이블은 공유 주어의 음높이 시퀀스를 전달합니다. 코드의 PATCH에서 연결 방향을 확인하세요.</p>
+                <button type="button" data-prompt="바다는 흐른다. 바다는 빛난다. 바다는 춤춘다.">문장으로 패치하기</button>
               </details>
               <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog" aria-label="문장 분석 보기">⌁</button>
               </details>

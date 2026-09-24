@@ -7,6 +7,28 @@ import { addMeaningLinks } from '../src/meaning-links.js';
 import { createArrangement, createStrudelCode } from '../src/music-engine.js';
 import { SemanticClient } from '../src/semantic-client.js';
 
+test('preload prepares an empty editor, then accepts only the latest text', async () => {
+  let worker;
+  const results = [], statuses = [];
+  const client = new SemanticClient({ delay:0, onResult:(text) => results.push(text), onStatus:(status) => statuses.push(status),
+    createWorker:() => (worker = { postMessage(data) { this.sent = data; }, terminate() { this.terminated = true; } }) });
+  client.preload();
+  await new Promise((done) => setTimeout(done, 10));
+  assert.equal(worker.sent.text, '');
+  assert.deepEqual(worker.sent.tokens, []);
+  const warmup = worker.sent;
+  client.request('평안', ['평안']);
+  await new Promise((done) => setTimeout(done, 10));
+  worker.onmessage({ data:{ type:'status', status:'ready' } });
+  worker.onmessage({ data:{ type:'result', ...warmup, result:{} } });
+  assert.deepEqual(results, []);
+  worker.onmessage({ data:{ type:'result', ...worker.sent, result:{} } });
+  assert.deepEqual(results, ['평안']);
+  assert.ok(statuses.includes('ready'));
+  client.disable();
+  assert.equal(worker.terminated, true);
+});
+
 test('cosine and confidence gating reject unrelated vectors', () => {
   assert.equal(cosineSimilarity([1,0], [2,0]), 1);
   assert.equal(cosineSimilarity([1,0], [0,1]), 0);

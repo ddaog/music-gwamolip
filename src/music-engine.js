@@ -1,4 +1,5 @@
 import { createRhythm } from './rhythm.js';
+import { createModularPatch, compileModularVoices, patchDescriptions } from './modular-patch.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const ramp = (value) => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * x); };
 
@@ -73,6 +74,10 @@ export function createStrudelCode(analysis, beat = {}) {
   if (analysis.tokens.length < 6) parts.splice(3, 1);
   if (analysis.tokens.length < 3) parts.splice(2, 1);
   if (analysis.tokens.length < 2) parts.splice(1, 1);
+  const patch = createModularPatch(analysis);
+  if (patch.modules.length > 1) {
+    parts.splice(0, 1, ...compileModularVoices(patch, { chords, root:analysis.root, scale:arrangement.scale }));
+  }
   if (arrangement.relationGain) {
     parts.push('n("' + alternate(arrangement.relationMelody) + '").scale("' + scale + '").s("sine").pan(.65).attack(.015).decay(.12).sustain(0).release(.2).gain(' + gain(arrangement.relationGain) + ')');
   }
@@ -83,7 +88,7 @@ export function createStrudelCode(analysis, beat = {}) {
       's("' + alternate(rhythm.hat) + '").hpf(7200).attack(.001).decay(.025).sustain(0).release(.015).gain("' + alternate(rhythm.accents.map((bar) => bar.split(' ').map((value) => gain(Number(value) * drums * .045)).join(' '))) + '")',
     );
   }
-  return 'setcpm(' + (arrangement.bpm / 4).toFixed(2) + ')\n\nstack(\n  ' + parts.join(',\n  ') + '\n)';
+  return 'setcpm(' + (arrangement.bpm / 4).toFixed(2) + ')\n' + patchDescriptions(patch).map((line) => '// PATCH ' + line).join('\n') + '\nstack(\n  ' + parts.join(',\n  ') + '\n)';
 }
 
 export class MusicEngine {

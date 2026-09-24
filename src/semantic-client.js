@@ -5,6 +5,7 @@ export class SemanticClient {
     this.enabled = false;
   }
   enable() { this.enabled = true; }
+  preload() { this.enable(); this.request('', []); }
   disable() {
     this.enabled = false;
     this.revision++;
@@ -16,14 +17,17 @@ export class SemanticClient {
     const id = ++this.revision;
     clearTimeout(this.timer);
     clearTimeout(this.watchdog);
-    if (!this.enabled || !text.trim()) return;
+    if (!this.enabled) return;
     this.timer = setTimeout(() => {
       if (!this.worker) {
         this.onStatus('loading');
         try { this.worker = this.createWorker(); } catch { this.fail(); return; }
         this.worker.onmessage = ({ data }) => {
           if (!this.enabled) return;
-          if (data.type === 'status') this.onStatus(data.status, data.progress);
+          if (data.type === 'status') {
+            if (data.status === 'ready') clearTimeout(this.watchdog);
+            this.onStatus(data.status, data.progress);
+          }
           if (data.type === 'error') this.fail();
           if (data.type === 'result' && data.id === this.revision) {
             clearTimeout(this.watchdog);

@@ -1,6 +1,7 @@
 import './styles.css';
 import { SemanticClient } from './semantic-client.js';
 import { addMeaningLinks } from './meaning-links.js';
+import { createModularPatch } from './modular-patch.js';
 import { editorFontSize } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
 import { renderLiveCode } from './live-code.js';
@@ -63,6 +64,14 @@ let autoPlayEnabled = true;
 let relationFrame;
 let composing = false;
 let semanticState = { text: '', meanings: {}, similarities: [] };
+let semanticReady = false;
+function updateSemanticSummary() {
+  if (!semanticReady) return;
+  const words = analysis.tokenMeanings.filter((word) => word.meaningSource === 'embedding').length;
+  const links = analysis.syntax.edges.filter((edge) => edge.type === 'semantic').length;
+  document.querySelector('#semantic-summary').textContent = words || links
+    ? `의미 확장 · ${words}단어 · ${links}연결` : '의미 확장 켜짐';
+}
 const semanticClient = new SemanticClient({
   onResult(text, result) {
     if (composing || text !== elements.sentence.value) return;
@@ -71,8 +80,22 @@ const semanticClient = new SemanticClient({
     if (autoPlayEnabled && engine.playing) applyLatestAudio();
   },
   onStatus(status, progress) {
+    const indicator = document.querySelector('#semantic-indicator');
+    const justReady = status === 'ready' && !semanticReady;
+    semanticReady = status === 'ready';
+    indicator.dataset.state = status;
+    indicator.setAttribute('aria-pressed', String(semanticReady));
+    indicator.setAttribute('aria-label', status === 'loading' ? '의미 확장 다운로드 취소' : semanticReady ? '의미 확장 끄기' : '의미 확장 켜기');
+    document.querySelector('#semantic-enabled').checked = semanticReady;
+    document.querySelector('#semantic-enabled').indeterminate = status === 'loading';
+    document.querySelector('#semantic-summary').textContent = status === 'loading' ? '의미 준비 중'
+      : status === 'error' ? '의미 확장 재시도' : '의미 확장';
+    updateSemanticSummary();
+    if (justReady && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      indicator.animate([{ boxShadow: '0 0 0 0 #779b8555' }, { boxShadow: '0 0 0 9px #779b8500' }], { duration: 1100 });
+    }
     document.querySelector('#semantic-status').textContent = status === 'ready' ? '의미 연결 준비됨'
-      : status === 'loading' ? `모델 준비 중${progress === undefined ? '' : ` · ${progress}%`}`
+      : status === 'loading' ? '모델 다운로드 · 기기 내 준비 중'
       : status === 'error' ? '모델 사용 불가 · 사전 모드로 계속' : '사전 모드';
     if (status === 'error') {
       document.querySelector('#semantic-enabled').checked = false;
@@ -155,6 +178,7 @@ function renderAnalysis() {
   renderLiveCode(document.querySelector('#live-code'), elements.sentence.value.trim() ? code : '');
   document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? (autoPlayEnabled ? '입력 반영 중' : '코드 준비됨') : '대기';
   renderWordHighlight();
+  updateSemanticSummary();
   visualizer.setAnalysis(analysis);
 }
 
@@ -176,6 +200,7 @@ function renderWordHighlight() {
     const meaning = tokens.get(rawToken) ?? committed ?? { token: rawToken, primaryConcept: 'unique', layer: 'near', traits: {} };
     const profile = visualProfileForToken(meaning?.primaryConcept, meaning?.token ?? match[0], meaning?.traits);
     word.className = 'word-token';
+    word.dataset.meaningSource = meaning.meaningSource ?? 'phonetic';
     word.dataset.effect = profile.effect;
     word.dataset.layer = meaning?.layer ?? 'near';
     word.dataset.token = meaning.token;
@@ -204,8 +229,10 @@ function renderRelations(wordNodes) {
   svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
   svg.replaceChildren();
   if (wordNodes.length < 2) return;
-  const sources = analysis.syntax.edges;
-  for (const { from, to, provisional, type } of sources) {
+  const patch = createModularPatch(analysis);
+  const sources = [...analysis.syntax.edges.filter((edge) => analysis.syntax.words[edge.from]?.sentence === analysis.syntax.words[edge.to]?.sentence),
+    ...patch.cables.map((cable) => ({ ...cable, type:'patch', provisional:cable.normalled }))];
+  for (const { from, to, provisional, type, kind, source, target } of sources) {
     if (!wordNodes[from]?.isConnected || !wordNodes[to]?.isConnected) continue;
     const a = wordNodes[from].getClientRects()[0] ?? wordNodes[from].getBoundingClientRect();
     const b = wordNodes[to].getClientRects()[0] ?? wordNodes[to].getBoundingClientRect();
@@ -222,6 +249,14 @@ function renderRelations(wordNodes) {
       path.setAttribute('d', `M ${x1} ${y1} C ${bend} ${y1}, ${bend} ${y2}, ${x2} ${y2}`);
     }
     path.setAttribute('class', 'relation-path');
+    if (type === 'patch') {
+      path.classList.add('is-patch');
+      path.dataset.signal = kind;
+      path.dataset.source = `M${source + 1}`;
+      path.dataset.target = `M${target + 1}`;
+      const bend = Math.max(5, Math.min(x1, x2) - 16 - (target % 3) * 6);
+      if (Math.abs(y2 - y1) > 20) path.setAttribute('d', `M ${x1} ${y1} C ${bend} ${y1}, ${bend} ${y2}, ${x2} ${y2}`);
+    }
     if (type === 'semantic' || type === 'repetition') path.classList.add(`is-${type}`);
     if (type === 'shared-subject') path.classList.add('is-shared');
     if (provisional) path.classList.add('is-provisional');
@@ -388,15 +423,22 @@ document.querySelector('#beat-mode').addEventListener('change', (event) => {
   if (engine.playing) applyLatestAudio();
 });
 
-document.querySelector('#semantic-enabled').addEventListener('change', (event) => {
-  if (event.target.checked) semanticClient.enable();
+function setSemanticEnabled(enabled) {
+  clearTimeout(semanticStartup);
+  try { localStorage.setItem('textusic-semantic-auto', String(enabled)); } catch { /* Storage can be unavailable. */ }
+  if (enabled) semanticClient.preload();
   else {
     semanticClient.disable();
     semanticState = { text: '', meanings: {}, similarities: [] };
   }
   analyzeCurrentText({ keepVariation: true });
   if (autoPlayEnabled && engine.playing) applyLatestAudio();
+}
+document.querySelector('#semantic-enabled').addEventListener('change', (event) => {
+  // A pending checkbox represents a cancellable download, not an active model.
+  setSemanticEnabled(semanticClient.enabled ? false : event.target.checked);
 });
+document.querySelector('#semantic-indicator').addEventListener('click', () => setSemanticEnabled(!semanticClient.enabled));
 document.querySelector('#beat-intensity').addEventListener('input', (event) => {
   beat.intensity = Number(event.target.value) / 100;
   document.querySelector('#beat-value').value = `${event.target.value}%`;
@@ -449,8 +491,23 @@ window.visualViewport?.addEventListener('resize', syncViewport);
 window.addEventListener('resize', syncViewport);
 syncViewport();
 
-window.addEventListener('pagehide', () => { engine.stop(); semanticClient.disable(); });
+window.addEventListener('pagehide', () => { clearTimeout(semanticStartup); engine.stop(); semanticClient.disable(); });
 
 elements.charCount.textContent = elements.sentence.value.length;
 elements.lexiconStats.textContent = `${LEXICON_STATS.concepts} imagery groups · ${(LEXICON_STATS.korean + LEXICON_STATS.english).toLocaleString()} ko/en words`;
 renderAnalysis();
+
+// Leave the first paint free; inference and model preparation run in a worker.
+const semanticStartup = setTimeout(() => {
+  let preference;
+  try { preference = localStorage.getItem('textusic-semantic-auto'); } catch { /* Use default. */ }
+  const connection = navigator.connection;
+  if (preference === 'false') return;
+  if (connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) {
+    document.querySelector('#semantic-summary').textContent = '의미 확장 · 다운로드';
+    document.querySelector('#semantic-status').textContent = '데이터 절약 중 · 직접 켜서 다운로드';
+    return;
+  }
+  semanticClient.preload();
+  if (elements.sentence.value.trim() && !composing) semanticClient.request(elements.sentence.value, analysis.tokens);
+}, 1200);
