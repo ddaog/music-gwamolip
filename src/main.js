@@ -1,13 +1,16 @@
 import './styles.css';
 import './reading.css';
+import './code-layout.css';
+import { MusicRecorder } from './music-recorder.js';
 import { SemanticClient } from './semantic-client.js';
 import { addMeaningLinks } from './meaning-links.js';
 import { createModularPatch, patchDescriptions } from './modular-patch.js';
 import { editorFontSize } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
-import { renderLiveCode } from './live-code.js';
+import { renderLiveCode, formatFullCode } from './live-code.js';
+import { musicInsights } from './music-insights.js';
 import { analyzeText, describeAnalysis } from './text-analyzer.js';
-import { LEXICON_STATS, CONCEPTS } from './lexicon.js';
+import { LEXICON_STATS } from './lexicon.js';
 import { createArrangement, createStrudelCode, MusicEngine } from './music-engine.js';
 import { Visualizer, visualProfileFor, visualProfileForToken } from './visualizer.js';
 
@@ -49,6 +52,21 @@ const elements = {
 };
 
 const engine = new MusicEngine();
+let recordingUrl;
+const recording = new MusicRecorder((blob, extension) => {
+  if (recordingUrl) URL.revokeObjectURL(recordingUrl);
+  recordingUrl = URL.createObjectURL(blob);
+  const link = document.querySelector('#record-save');
+  link.href = recordingUrl;
+  link.download = `textusic-${Date.now()}.${extension}`;
+  link.hidden = false;
+  document.querySelector('#record-status').textContent = '녹음 완료 · 파일 저장을 눌러주세요';
+  document.querySelector('#record-button').textContent = '● 음악 녹음';
+}, (status) => {
+  document.querySelector('#record-status').textContent = status;
+  document.querySelector('#record-button').textContent = recording.active ? '■ 녹음 끝내기' : '● 음악 녹음';
+});
+engine.onOutput = (output) => recording.connect(output);
 let variation = 0;
 let analysis = analyzeText(elements.sentence.value, variation);
 analysis.syntax = addMeaningLinks(analyzeSyntax(elements.sentence.value));
@@ -187,7 +205,7 @@ function renderAnalysis() {
   elements.translationNote.textContent = hasText ? describeAnalysis(analysis) : '입력한 단어의 심상과 관계를 음악으로 해석합니다.';
   elements.farWords.textContent = hasText ? analysis.layers.farTokens.join(' · ') || '—' : '—';
   elements.nearWords.textContent = hasText ? analysis.layers.nearTokens.join(' · ') || '—' : '—';
-  elements.code.textContent = hasText ? code : '// 문장을 기다리는 중';
+  elements.code.textContent = hasText ? formatFullCode(code) : '// 문장을 기다리는 중';
   renderLiveCode(document.querySelector('#live-code'), elements.sentence.value.trim() ? code : '');
   document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? (autoPlayEnabled ? '입력 반영 중' : '코드 준비됨') : '대기';
   renderWordHighlight();
@@ -216,10 +234,7 @@ function renderSemanticDetails() {
       row.append(heading, description); host.append(row);
     }
   };
-  const words = hasText && semanticReady ? analysis.tokenMeanings.filter((word) => word.meaningSource === 'embedding') : [];
-  const labels = (ids) => ids.map((id) => CONCEPTS.find((concept) => concept.id === id)?.label ?? id).join(' · ');
-  render('#semantic-words', words.map((word) => [`${word.token} → ${labels(word.conceptIds)}`, '이 심상의 온도·움직임·빛·여백을 음색과 문장의 음악 특성에 반영했습니다.']),
-    !hasText ? '먼저 문장을 입력해보세요.' : !semanticReady ? unavailable : '추가 해석한 단어는 없어요. 사전이 이미 아는 단어이거나, 뜻이 충분히 가깝지 않은 단어입니다.');
+  render('#semantic-words', hasText ? musicInsights(analysis, beat) : [], '문장을 입력하면 분위기·악기·연결이 어떻게 정해졌는지 알려드릴게요.');
   const patch = createModularPatch(analysis);
   const links = hasText && semanticReady ? analysis.syntax.edges.filter((edge) => edge.type === 'semantic') : [];
   render('#semantic-links', links.map((edge) => {
@@ -346,6 +361,7 @@ function stopPlayback(message = '연주를 멈췄어요. 문장을 바꾸거나 
   autoPlayEnabled = false;
   audioRevision += 1;
   engine.stop();
+  recording.stop();
   visualizer.setPlaying(false);
   updatePlaybackStatus();
   elements.status.textContent = message;
@@ -472,6 +488,22 @@ document.querySelector('#beat-mode').addEventListener('change', (event) => {
   if (engine.playing) applyLatestAudio();
 });
 
+document.querySelector('#record-button').addEventListener('click', async (event) => {
+  if (recording.active) { recording.stop(); return; }
+  if (!elements.sentence.value.trim()) { elements.sentence.focus(); document.querySelector('#record-status').textContent = '먼저 문장을 입력해주세요'; return; }
+  event.currentTarget.disabled = true;
+  try {
+    if (audioTask) await audioTask;
+    if (!engine.playing) await playCurrent();
+    if (!engine.playing) throw new Error('재생을 시작한 뒤 녹음해주세요.');
+    const module = await engine.module;
+    recording.start(module.getAudioContext(), module.getSuperdoughAudioController().output.destinationGain);
+    document.querySelector('#record-save').hidden = true;
+  } catch (error) { document.querySelector('#record-status').textContent = error.message; }
+  finally { document.querySelector('#record-button').disabled = false; }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) recording.stop(); });
+
 function setSemanticEnabled(enabled) {
   clearTimeout(semanticStartup);
   try { localStorage.setItem('textusic-semantic-auto', String(enabled)); } catch { /* Storage can be unavailable. */ }
@@ -549,7 +581,7 @@ window.visualViewport?.addEventListener('resize', syncViewport);
 window.addEventListener('resize', syncViewport);
 syncViewport();
 
-window.addEventListener('pagehide', () => { clearTimeout(semanticStartup); engine.stop(); semanticClient.disable(); });
+window.addEventListener('pagehide', () => { clearTimeout(semanticStartup); recording.stop(); engine.stop(); semanticClient.disable(); });
 
 elements.charCount.textContent = elements.sentence.value.length;
 elements.lexiconStats.textContent = `${LEXICON_STATS.concepts} imagery groups · ${(LEXICON_STATS.korean + LEXICON_STATS.english).toLocaleString()} ko/en words`;

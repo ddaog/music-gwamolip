@@ -1,4 +1,5 @@
 import { createRhythm } from './rhythm.js';
+import { configurePlaybackSession } from './audio-session.js';
 import { createModularPatch, compileModularVoices, patchDescriptions } from './modular-patch.js';
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const ramp = (value) => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * x); };
@@ -105,7 +106,7 @@ export class MusicEngine {
     if (this.ready) return;
     if (!this.initializing) {
       this.initializing = this.module
-        .then(({ initStrudel }) => initStrudel())
+        .then((module) => { this.audioModule = module; return module.initStrudel(); })
         .then((repl) => {
           this.repl = repl;
           this.ready = true;
@@ -115,12 +116,17 @@ export class MusicEngine {
   }
 
   async play(code) {
+    configurePlaybackSession();
     const revision = ++this.revision;
     await this.init();
+    if (revision !== this.revision) return;
+    const context = this.audioModule.getAudioContext?.();
+    if (context && context.state !== 'running') await context.resume();
     if (revision !== this.revision) return;
     // Global hush is replaced by Strudel's evaluation scope with a pattern
     // reset helper. Keep the actual REPL transport instead of using globals.
     await this.repl.evaluate(code, false);
+    if (this.onOutput) this.onOutput(this.audioModule.getSuperdoughAudioController().output.destinationGain);
     if (revision !== this.revision) return;
     if (this.repl.state?.evalError) throw this.repl.state.evalError;
     if (!this.repl.scheduler.started) await this.repl.start();
