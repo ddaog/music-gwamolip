@@ -57,8 +57,8 @@ function metricNumber(value) {
 }
 
 function renderAnalysis() {
-  const labels = analysis.concepts.slice(0, 3).map((concept) => concept.label);
-  elements.visualTitle.textContent = labels.join(' · ');
+  const labels = elements.sentence.value.trim() ? analysis.concepts.slice(0, 3).map((concept) => concept.label) : [];
+  elements.visualTitle.textContent = labels.join(' · ') || '—';
   elements.keywordList.innerHTML = '';
 
   for (const [index, concept] of analysis.concepts.entries()) {
@@ -177,17 +177,26 @@ function renderRelations(wordNodes) {
   if (object >= 0 && object !== predicate) sources.push([object, predicate]);
   if (modifier >= 0) sources.push([modifier, Math.min(modifier + 1, wordNodes.length - 1)]);
   for (const [from, to] of sources) {
-    const a = wordNodes[from].getBoundingClientRect();
-    const b = wordNodes[to].getBoundingClientRect();
+    const a = wordNodes[from].getClientRects()[0] ?? wordNodes[from].getBoundingClientRect();
+    const b = wordNodes[to].getClientRects()[0] ?? wordNodes[to].getBoundingClientRect();
     const x1 = a.left + a.width / 2 - rect.left;
     const x2 = b.left + b.width / 2 - rect.left;
-    const y1 = a.top - rect.top + 1;
-    const y2 = b.top - rect.top + 1;
-    const lift = Math.max(12, Math.min(y1, y2) - 8);
+    const y1 = a.top + a.height / 2 - rect.top;
+    const y2 = b.top + b.height / 2 - rect.top;
+    const distance = Math.abs(x2 - x1);
+    const lift = Math.max(8, Math.min(y1, y2) - Math.min(18, 7 + distance * .035));
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${lift} ${x2} ${y2}`);
     path.setAttribute('class', 'relation-path');
     svg.append(path);
+    for (const [x, y] of [[x1, y1], [x2, y2]]) {
+      const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      point.setAttribute('cx', x);
+      point.setAttribute('cy', y);
+      point.setAttribute('r', '1.6');
+      point.setAttribute('class', 'relation-point');
+      svg.append(point);
+    }
   }
 }
 
