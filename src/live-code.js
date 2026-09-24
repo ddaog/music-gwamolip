@@ -1,3 +1,5 @@
+import { scheduleCodeFit } from './code-fit.js';
+
 export function codeLayers(source) {
   return source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line)).map((line) => {
     const label = line.includes('.pan(.65)') ? 'RELATION' : line.includes('.penv(') ? 'KICK' : line.includes('.hpf(7200)') ? 'HI-HAT'
@@ -40,6 +42,7 @@ export function renderLiveCode(host, source) {
     if (index < lines.length - 1) fragment.append(document.createTextNode('\n'));
   });
   host.replaceChildren(fragment);
+  scheduleCodeFit(host);
 }
 
 export function formatFullCode(source) {

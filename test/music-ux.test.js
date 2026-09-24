@@ -5,6 +5,13 @@ import { MusicRecorder } from '../src/music-recorder.js';
 import { musicInsights } from '../src/music-insights.js';
 import { analyzeText } from '../src/text-analyzer.js';
 import { formatFullCode } from '../src/live-code.js';
+import { fitCodeFont } from '../src/code-fit.js';
+
+test('code fits at the largest readable size, never below 11px', () => {
+  assert.equal(fitCodeFont((size) => size * 10, 140), 13);
+  assert.equal(fitCodeFont((size) => size * 10, 120), 12);
+  assert.equal(fitCodeFont((size) => size * 10, 20), 11);
+});
 
 test('playback session is a safe capability-gated hint', () => {
   const nav = { audioSession:{type:'auto'} };

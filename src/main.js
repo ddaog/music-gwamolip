@@ -5,7 +5,7 @@ import { MusicRecorder } from './music-recorder.js';
 import { SemanticClient } from './semantic-client.js';
 import { addMeaningLinks } from './meaning-links.js';
 import { createModularPatch, patchDescriptions } from './modular-patch.js';
-import { editorFontSize } from './editor-layout.js';
+import { editorFontSize, fitEditorFont } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
 import { renderLiveCode, formatFullCode } from './live-code.js';
 import { musicInsights } from './music-insights.js';
@@ -129,10 +129,15 @@ const semanticClient = new SemanticClient({
 function syncEditorLayout() {
   const input = elements.sentence;
   const compact = document.documentElement.classList.contains('compact-viewport');
-  input.parentElement.style.setProperty('--editor-font-size', `${editorFontSize(input.value, window.innerWidth, compact)}px`);
+  const preferred = editorFontSize(input.value, window.innerWidth, compact);
   const previousScroll = input.scrollTop;
   input.style.height = '0px';
   const style = getComputedStyle(input);
+  const size = fitEditorFont(preferred, parseFloat(style.maxHeight), (candidate) => {
+    input.parentElement.style.setProperty('--editor-font-size', `${candidate}px`);
+    return input.scrollHeight;
+  });
+  input.parentElement.style.setProperty('--editor-font-size', `${size}px`);
   input.style.height = `${Math.min(parseFloat(style.maxHeight), Math.max(parseFloat(style.minHeight), input.scrollHeight))}px`;
   input.style.overflowY = input.scrollHeight > input.clientHeight ? 'auto' : 'hidden';
   input.scrollTop = previousScroll;

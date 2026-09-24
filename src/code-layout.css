@@ -1,7 +1,7 @@
-.live-code-panel .live-code-scroll { padding:16px 0; font:12px/1.9 var(--mono); background:#e9ede7; tab-size:2; }
-#live-code { display:block; white-space:pre; width:max-content; min-width:100%; }
-#live-code .code-line { display:inline-block; vertical-align:top; min-width:100%; padding:0 20px 0 46px; font:inherit; border-left:2px solid transparent; }
-#live-code .code-line::before { left:12px; color:#a0aa9b; font:10px/2.28 var(--mono); user-select:none; }
+.live-code-panel .live-code-scroll { padding:14px 0; font:var(--code-font-size, 13px)/1.75 var(--mono); background:#e9ede7; tab-size:2; overflow-x:hidden; overflow-y:auto; }
+#live-code { display:block; white-space:normal; width:100%; min-width:0; }
+#live-code .code-line { display:block; width:100%; min-width:0; padding:0 14px 0 calc(40px + 2ch); text-indent:-2ch; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; border-left:2px solid transparent; }
+#live-code .code-line::before { left:10px; top:0; text-indent:0; color:#a0aa9b; font:10px var(--mono); line-height:calc(var(--code-font-size, 13px) * 1.75); user-select:none; }
 #live-code .code-line:hover { background:#dce4d755; border-left-color:#b4c3ac; }
 #live-code .code-function { color:#456b64; }
 #live-code .code-string { color:#956647; }
@@ -12,7 +12,7 @@
 .record-controls [hidden] { display:none; }
 .reading-dialog .code-wrap pre { font-size:12px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:2; }
 @media(max-width:600px) {
-  .live-code-panel .live-code-scroll { height:180px; padding:12px 0; font-size:11px; }
+  .live-code-panel .live-code-scroll { height:180px; padding:12px 0; }
   .compact-viewport .live-code-panel .live-code-scroll { height:90px; }
   .record-controls { gap:6px; font-size:9px; }
 }
