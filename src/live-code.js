@@ -19,46 +19,27 @@ export function visiblePatternCode(source) {
 }
 export function renderLiveCode(host, source) {
   const layers = codeLayers(source);
-  const lines = source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line));
-  const openKeys = new Set([...host.querySelectorAll('details[open]')].map((item) => item.dataset.key));
-  const focusedKey = host.contains(document.activeElement) ? document.activeElement.closest('details')?.dataset.key : null;
-  host.closest('.live-code-panel')?.style.setProperty('--pattern-rows', Math.max(4, lines.length * 3));
+  const lines = visiblePatternCode(source);
+  host.closest('.live-code-panel')?.style.setProperty('--pattern-rows', lines.length);
   const count = document.querySelector('#layer-count');
   if (count) count.textContent = `${layers.length} LAYERS`;
   const fragment = document.createDocumentFragment();
-  const patches = source.split('\n').filter((line) => line.startsWith('// PATCH '));
-  if (patches.length) {
-    const box = document.createElement('details'); box.className = 'code-patches'; box.dataset.key = 'patches'; box.open = openKeys.has('patches');
-    const summary = document.createElement('summary'); summary.textContent = `PATCH · ${patches.length}개 연결`; box.append(summary);
-    for (const line of patches) { const p = document.createElement('p'); p.textContent = line.slice(9); box.append(p); }
-    fragment.append(box);
-  }
-  const names = { MELODY:'선율', CHORDS:'화음', BASS:'베이스', SPARKLE:'보조 선율', RELATION:'응답 선율', KICK:'킥', SNARE:'스네어', 'HI-HAT':'하이햇' };
   lines.forEach((line, index) => {
-    const label = layers[index].split('  →')[0];
-    const module = line.match(/\/\* (M\d+):/u)?.[1];
-    const pattern = line.match(/(?:n|note|s)\("([^"\n]*)"\)/u)?.[1] ?? '';
-    const bars = [...pattern.matchAll(/\[([^\]]+)\]/gu)].map((match) => match[1]);
-    if (!bars.length) bars.push(pattern);
-    const row = document.createElement('details'); row.className = 'code-voice';
-    row.dataset.key = module ?? label; row.open = openKeys.has(row.dataset.key);
-    const summary = document.createElement('summary');
-    const title = document.createElement('span'); title.textContent = module ? `${module} · 문장 선율` : names[label] ?? label;
-    const meta = document.createElement('small'); meta.textContent = `${bars.length}마디`;
-    const operation = line.match(/^\s*(n|note|s)\(/u)?.[1] ?? 'n';
-    const preview = document.createElement('code'); preview.textContent = `${operation}("[${bars[0]}]")`;
-    summary.append(title, meta, preview); row.append(summary);
-    bars.forEach((bar, i) => {
-      const barRow = document.createElement('div'); barRow.className = 'code-bar';
-      const number = document.createElement('span'); number.textContent = String(i + 1).padStart(2, '0');
-      const notes = document.createElement('code'); notes.textContent = bar;
-      barRow.append(number, notes); row.append(barRow);
-    });
+    const row = document.createElement('span');
+    row.className = 'code-line'; row.dataset.line = String(index + 1).padStart(2, '0');
+    let cursor = 0;
+    for (const match of line.matchAll(/\/\/.*$|\/\*.*?\*\/|"[^"\n]*"|\b[a-zA-Z]+(?=\()/gu)) {
+      row.append(document.createTextNode(line.slice(cursor, match.index)));
+      const token = document.createElement('span');
+      token.className = match[0].startsWith('/') ? 'code-comment' : match[0].startsWith('"') ? 'code-string' : 'code-function';
+      token.textContent = match[0]; row.append(token);
+      cursor = match.index + match[0].length;
+    }
+    row.append(document.createTextNode(line.slice(cursor)));
     fragment.append(row);
+    if (index < lines.length - 1) fragment.append(document.createTextNode('\n'));
   });
-  if (!lines.length) { const empty = document.createElement('p'); empty.className = 'code-empty'; empty.textContent = '// 첫 단어를 기다리는 중'; fragment.append(empty); }
   host.replaceChildren(fragment);
-  if (focusedKey) [...host.querySelectorAll('details')].find((item) => item.dataset.key === focusedKey)?.querySelector('summary').focus({preventScroll:true});
 }
 
 export function formatFullCode(source) {
