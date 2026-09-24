@@ -11,6 +11,7 @@
     <title>음악과몰입 — 공간과몰입의 소리 방명록</title>
   </head>
   <body>
+    <aside id="guest-sidebar" class="reading-dialog guest-gallery" aria-label="남겨진 문장들" hidden></aside>
     <div class="page-shell">
       <header class="site-header">
         <a class="brand" href="#top" aria-label="음악과몰입">
@@ -138,12 +139,14 @@
           </form>
         </dialog>
         <dialog id="guest-gallery" class="reading-dialog guest-gallery" aria-labelledby="gallery-title">
+          <div id="gallery-panel">
           <header class="dialog-header"><div><p class="eyebrow">음악과몰입 / LOCAL COLLECTION</p><h2 id="gallery-title">이곳에 머문 문장들</h2></div><button id="gallery-close" class="dialog-close" type="button" aria-label="방명록으로 돌아가기" autofocus>×</button></header>
           <div class="gallery-player"><span id="gallery-playing"></span><button id="gallery-playback" type="button">소리 멈추기</button></div>
           <div class="reading-content">
             <div class="gallery-tools"><span id="gallery-count">0개의 문장</span><button id="gallery-refresh" type="button">새로 읽기</button></div>
             <p id="gallery-message" role="status"></p><div id="gallery-list"></div>
             <div class="gallery-backup"><p>같은 사이트 주소·브라우저에 저장된 작품입니다.<br>브라우저 데이터 삭제 시 사라질 수 있으니 백업해주세요.</p><button id="gallery-export" type="button">전체 백업 만들기</button><a id="gallery-download" hidden>백업 파일 저장 ↓</a></div>
+          </div>
           </div>
         </dialog>
         <dialog id="semantic-dialog" class="reading-dialog" aria-labelledby="semantic-title">

@@ -6,6 +6,20 @@ export function setupGuestbook({capture, load, playback, togglePlayback}) {
   const $ = (selector) => document.querySelector(selector);
   const gallery = $('#guest-gallery');
   const saving = $('#guest-save-dialog');
+  const sidebar = $('#guest-sidebar');
+  const panel = $('#gallery-panel');
+  const desktop = window.matchMedia('(min-width: 1100px)');
+  let loadingWork = false;
+  const placePanel = () => {
+    const hadFocus = panel.contains(document.activeElement);
+    if (gallery.open) gallery.close();
+    sidebar.hidden = !desktop.matches;
+    (desktop.matches ? sidebar : gallery).append(panel);
+    $('#guest-gallery-open').hidden = desktop.matches;
+    if (hadFocus) (desktop.matches ? $('#gallery-refresh') : $('#guest-gallery-open')).focus();
+  };
+  desktop.addEventListener('change', placePanel);
+  placePanel();
   let pending, lastSaved = '', galleryRevision = 0, backupUrl;
   const fingerprint = (snapshot) => JSON.stringify([snapshot.text, snapshot.code]);
   const hasUnsavedWork = () => {
@@ -41,12 +55,12 @@ export function setupGuestbook({capture, load, playback, togglePlayback}) {
       lastSaved = key;
       saving.close(); $('#guest-author').value = '';
       status('이 컴퓨터에 문장과 음악 코드를 남겼습니다. 갤러리에서 다시 들을 수 있어요.');
+      await refreshGallery();
     } catch { $('#guest-save-error').textContent = '저장하지 못했어요. 브라우저 저장 공간·권한을 확인하고 다시 시도해주세요. 문장은 그대로 남아 있습니다.'; }
     finally { button.disabled = false; }
   });
   $('#guest-save-cancel').addEventListener('click', () => saving.close());
-  const showGallery = async () => {
-    if (!gallery.open) gallery.showModal();
+  const refreshGallery = async () => {
     syncPlayback();
     const revision = ++galleryRevision;
     $('#gallery-message').textContent = '문장들을 불러오는 중';
@@ -69,19 +83,27 @@ export function setupGuestbook({capture, load, playback, togglePlayback}) {
         details.append(summary, pre);
         const button = document.createElement('button'); button.type = 'button'; button.textContent = '이 문장 불러와 듣기 ↗'; button.disabled = !valid;
         button.addEventListener('click', async () => {
-          if (hasUnsavedWork() && !confirm('작성 중인 문장은 저장되지 않았어요. 선택한 작품을 불러올까요?')) return;
+          if (loadingWork) return;
+          try {
+            if (hasUnsavedWork() && !confirm('작성 중인 문장은 저장되지 않았어요. 선택한 작품을 불러올까요?')) return;
+          } catch { $('#gallery-message').textContent = '입력을 마친 뒤 다시 선택해주세요.'; return; }
+          loadingWork = true;
           button.disabled = true;
           try { await load(structuredClone(entry.snapshot)); lastSaved = fingerprint(entry.snapshot); gallery.close(); status(`${entry.author}의 문장을 불러왔어요. 수정해도 원본은 그대로 남습니다.`); }
           catch { $('#gallery-message').textContent = '작품을 불러오지 못했어요. 다시 시도해주세요.'; }
-          finally { button.disabled = !valid; }
+          finally { button.disabled = !valid; loadingWork = false; }
         });
         card.append(meta, poem, label, details, button); $('#gallery-list').append(card);
       }
     } catch { $('#gallery-message').textContent = '저장된 문장을 읽지 못했어요. 브라우저 저장 권한을 확인하고 다시 열어주세요.'; }
   };
-  $('#guest-gallery-open').addEventListener('click', showGallery);
+  $('#guest-gallery-open').addEventListener('click', () => {
+    if (!desktop.matches && !gallery.open) gallery.showModal();
+    refreshGallery();
+  });
   $('#gallery-close').addEventListener('click', () => gallery.close());
-  $('#gallery-refresh').addEventListener('click', showGallery);
+  $('#gallery-refresh').addEventListener('click', refreshGallery);
+  refreshGallery();
   $('#gallery-export').addEventListener('click', async () => {
     try {
       const entries = await store.list();
