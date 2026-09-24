@@ -23,7 +23,7 @@
       </header>
 
       <main id="top">
-        <div class="guest-welcome"><p>공간과몰입에 남기는 소리 방명록</p><button id="guest-gallery-open" type="button" aria-haspopup="dialog" aria-controls="guest-gallery">남겨진 문장들 ↗</button></div>
+        <div class="guest-welcome"><p>공간과몰입에 남기는 소리 방명록</p><div class="guest-top-actions"><button id="guest-gallery-open" type="button" aria-haspopup="dialog" aria-controls="guest-gallery">남겨진 문장들 ↗</button><button id="guest-save" type="button" aria-haspopup="dialog" aria-controls="guest-save-dialog">이 문장 남기기</button></div></div>
         <section class="hero-grid" aria-labelledby="page-title">
           <div class="copy-panel">
             <h1 id="page-title" class="visually-hidden">음악과몰입</h1>
@@ -46,10 +46,6 @@
               <p id="sentence-help" class="visually-hidden">문장을 입력하면 음악이 재생됩니다.</p>
 
               <div class="action-row">
-                <button id="play-button" class="primary-action" type="button">
-                  <span class="play-icon" aria-hidden="true"></span>
-                  <span class="action-label">재생</span>
-                </button>
                 <button id="variation-button" class="secondary-action" type="button">
                   <span aria-hidden="true">↝</span> 변주
                 </button>
@@ -57,7 +53,11 @@
               </div>
               <p class="status-line" id="status-line" aria-live="polite"> </p>
               <details class="instrument-settings">
-                <summary>비트 · 가이드</summary>
+                <summary>소리 · 비트 · 가이드</summary>
+                <button id="play-button" class="secondary-action" type="button">
+                  <span class="play-icon" aria-hidden="true"></span>
+                  <span class="action-label">재생</span>
+                </button>
                 <div class="semantic-controls">
                   <label><input id="semantic-enabled" type="checkbox" /> AI 단어 해석</label>
                   <small id="semantic-help">사전에 없는 단어도 비슷한 뜻을 찾아 음악에 반영합니다. 준비 중에도 기본 음악은 재생됩니다.</small>
@@ -90,7 +90,7 @@
               <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog" aria-label="문장 분석 보기">⌁</button>
               </details>
               <div class="record-controls"><button id="record-button" type="button">● 음악 녹음</button><span id="record-status" role="status">마이크 없이 음악만 저장</span><a id="record-save" hidden>파일 저장 ↓</a></div>
-              <div class="guest-actions"><button id="guest-save" type="button" aria-haspopup="dialog" aria-controls="guest-save-dialog">이 문장 남기기</button><button id="guest-new" type="button">새 방명록 쓰기</button><span id="guest-status" role="status">이 컴퓨터에 문장과 음악 코드가 함께 남습니다.</span></div>
+              <p id="guest-status" role="status">이 컴퓨터에 문장과 음악 코드가 함께 남습니다.</p>
             </div>
           </div>
 

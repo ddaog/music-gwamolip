@@ -1,7 +1,7 @@
 import { GuestbookStore, createGuestbookEntry, validateSnapshot } from './guestbook-store.js';
 import { visiblePatternCode } from './live-code.js';
 
-export function setupGuestbook({capture, load, newEntry, playback, togglePlayback}) {
+export function setupGuestbook({capture, load, playback, togglePlayback}) {
   const store = new GuestbookStore();
   const $ = (selector) => document.querySelector(selector);
   const gallery = $('#guest-gallery');
@@ -45,10 +45,6 @@ export function setupGuestbook({capture, load, newEntry, playback, togglePlaybac
     finally { button.disabled = false; }
   });
   $('#guest-save-cancel').addEventListener('click', () => saving.close());
-  $('#guest-new').addEventListener('click', () => {
-    if (hasUnsavedWork() && !confirm('아직 저장하지 않은 문장이 있어요. 저장하지 않고 새로 쓸까요?')) return;
-    newEntry(); lastSaved = ''; status('다음 독자의 문장을 기다립니다.');
-  });
   const showGallery = async () => {
     if (!gallery.open) gallery.showModal();
     syncPlayback();

@@ -1,9 +1,10 @@
 .guest-welcome { max-width:1000px; margin:18px auto 0; display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .guest-welcome p { margin:0; font:11px var(--sans); color:#788276; }
 .guest-welcome button, .guest-actions button, .guest-gallery button:not(.dialog-close), #guest-save-confirm, .gallery-backup a { border:1px solid #c7d0c2; border-radius:6px; padding:10px 14px; color:#53654f; background:#e3e9df; font:11px var(--sans); cursor:pointer; text-decoration:none; }
-.guest-actions { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding-top:10px; border-top:1px solid #cfd7ca; }
-.guest-actions #guest-save, #guest-save-confirm { background:#56684f; color:#f0f3ed; border-color:#56684f; }
-.guest-actions #guest-new { background:transparent; }
+.guest-top-actions { display:flex; align-items:center; gap:8px; }
+.guest-top-actions button { min-height:44px; white-space:nowrap; }
+.guest-welcome #guest-save, #guest-save-confirm { background:#56684f; color:#f0f3ed; border-color:#56684f; }
+.guest-welcome #guest-gallery-open { background:transparent; border-color:transparent; }
 #guest-status { flex:1 1 200px; color:#788276; font:10px/1.6 var(--sans); }
 .guest-gallery { width:min(1040px, calc(100vw - 32px)); }
 .gallery-player { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 28px; border-bottom:1px solid #d6ddd1; background:#e6ece1; }
@@ -29,9 +30,24 @@
 .gallery-backup a { display:inline-block; margin:8px; }
 .gallery-backup [hidden] { display:none; }
 @media(max-width:600px) {
-  .guest-welcome { margin-top:12px; }
-  .guest-welcome p { font-size:10px; max-width:150px; line-height:1.6; }
+  .guest-welcome { margin-top:12px; flex-wrap:wrap; }
+  .guest-welcome p { font-size:10px; line-height:1.6; }
+  .guest-top-actions { width:100%; justify-content:space-between; }
   #gallery-list { grid-template-columns:1fr; }
   .guest-card { padding:20px; }
   .gallery-player { padding:12px 18px; gap:8px; }
+}
+.composer .word-token[data-place-color="true"] {
+  color: var(--word-color);
+  text-shadow: none;
+}
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .composer .word-token[data-place-color="true"] {
+    background: var(--word-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
 }

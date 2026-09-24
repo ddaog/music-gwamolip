@@ -53,6 +53,10 @@ export function visualProfileFor(id) {
 
 export function visualProfileForToken(id, token = '', traits = {}) {
   const base = visualProfileFor(id);
+  // Place names keep their signature even after semantic analysis changes.
+  const place = PLACE_COLORS.find(({ word }) => token.normalize('NFC').startsWith(word)
+    && /^(?:(?:에서|으로|부터|까지|처럼|보다|에게|이랑|하고|은|는|이|가|을|를|의|와|과|도|만|에|로|랑|요)|[ㄱ-ㅎㅏ-ㅣ])*$/u.test(token.normalize('NFC').slice(word.length)));
+  if (place) return { ...base, color: place.colors[0], accent: place.colors.at(-1), gradient: `linear-gradient(100deg, ${place.colors.join(', ')})` };
   if (id === 'unique' && token) {
     const hash = [...token].reduce((value, character, index) => Math.imul(value ^ character.codePointAt(0), 16777619) + index, 2166136261) >>> 0;
     const light = Math.max(0, Math.min(1, traits.light ?? 0.5));
@@ -85,6 +89,13 @@ export function visualProfileForToken(id, token = '', traits = {}) {
   ];
   return shades.find((shade) => shade.words.some((word) => text.includes(word))) ?? base;
 }
+
+const PLACE_COLORS = [
+  { word: '공간과몰입', colors: ['#df493b', '#d5ac20', '#3479cf'] },
+  { word: '낙산공원', colors: ['#297849', '#79ad48', '#348563'] },
+  { word: '혜화', colors: ['#66b8dd', '#3166c7'] },
+  { word: '오쏘파스타', colors: ['#bb8534', '#e2bc67', '#c89542'] },
+];
 
 function withAlpha(hex, alpha) {
   const value = hex.replace('#', '');

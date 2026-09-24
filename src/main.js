@@ -281,6 +281,10 @@ function renderWordHighlight() {
     word.dataset.role = role;
     word.style.setProperty('--word-color', profile.color);
     word.style.setProperty('--word-accent', profile.accent);
+    if (profile.gradient) {
+      word.dataset.placeColor = 'true';
+      word.style.setProperty('--word-gradient', profile.gradient);
+    }
     word.style.setProperty('--word-glow', `${Math.round(5 + ((meaning.traits.light ?? 0) + 0.4) * 18)}px`);
     word.style.setProperty('--word-speed', `${(2.9 - Math.max(0, meaning.traits.motion ?? 0) * 2.1).toFixed(2)}s`);
     word.style.setProperty('--word-delay', `${-(tokenIndex % 7) * 0.23}s`);
@@ -625,16 +629,6 @@ setupGuestbook({
     audioRevision++;
     await applyLatestAudio();
     if (!engine.playing) throw new Error('재생을 시작할 수 없어요.');
-  },
-  newEntry() {
-    stopPlayback();
-    semanticClient.invalidate();
-    semanticState = {text:'', meanings:{}, similarities:[]};
-    elements.sentence.value = '';
-    elements.charCount.textContent = '0';
-    analyzeCurrentText();
-    autoPlayEnabled = true;
-    elements.sentence.focus();
   },
   playback:() => ({playing:engine.playing, text:elements.sentence.value}),
   togglePlayback:playCurrent,
