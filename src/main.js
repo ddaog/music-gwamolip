@@ -1,7 +1,8 @@
 import './styles.css';
+import { analyzeSyntax } from './syntax.js';
 import { analyzeText, describeAnalysis } from './text-analyzer.js';
 import { LEXICON_STATS } from './lexicon.js';
-import { createStrudelCode, MusicEngine } from './music-engine.js';
+import { createArrangement, createStrudelCode, MusicEngine } from './music-engine.js';
 import { Visualizer, visualProfileFor, visualProfileForToken } from './visualizer.js';
 
 const elements = {
@@ -44,8 +45,12 @@ const elements = {
 const engine = new MusicEngine();
 let variation = 0;
 let analysis = analyzeText(elements.sentence.value, variation);
-analysis.syntax = syntaxSummary(elements.sentence.value);
-let code = createStrudelCode(analysis);
+analysis.syntax = analyzeSyntax(elements.sentence.value);
+const beat = { mode: 'auto', intensity: 0.55 };
+const initialArrangement = createArrangement(analysis, beat);
+analysis.bpm = initialArrangement.bpm;
+analysis.scale = initialArrangement.scale;
+let code = createStrudelCode(analysis, beat);
 const visualizer = new Visualizer(elements.canvas, analysis);
 let updateTimer;
 let audioTask = null;
@@ -121,7 +126,7 @@ function renderWordHighlight() {
     word.dataset.effect = profile.effect;
     word.dataset.layer = meaning?.layer ?? 'near';
     word.dataset.token = meaning.token;
-    const role = grammaticalRole(rawToken, tokenIndex, text);
+    const role = analysis.syntax.words[tokenIndex]?.role ?? 'word';
     word.dataset.role = role;
     word.style.setProperty('--word-color', profile.color);
     word.style.setProperty('--word-accent', profile.accent);
@@ -139,43 +144,14 @@ function renderWordHighlight() {
   requestAnimationFrame(() => renderRelations(wordNodes));
 }
 
-function grammaticalRole(word, index, text) {
-  const words = [...text.toLowerCase().matchAll(/[가-힣a-z0-9]+/giu)].map((match) => match[0]);
-  const englishVerbs = new Set(['is', 'are', 'was', 'were', 'be', 'am', 'seem', 'feel', 'become', 'flow', 'flows', 'move', 'moves', 'dance', 'dances', 'shine', 'shines', 'walk', 'walks', 'run', 'runs', 'sing', 'sings', 'breathe', 'breathes', 'fall', 'falls', 'rise', 'rises', 'glow', 'glows', 'drift', 'drifts', 'touch', 'touches', 'hold', 'holds', 'open', 'opens', 'close', 'closes']);
-  const predicates = words.map((item, at) => ({ item, at })).filter(({ item }) => /(?:다|는다|ㄴ다|했다|한다|흐른다|피어난다|어|아|고|면|네|죠)$/u.test(item) || englishVerbs.has(item) || /(?:ing|ed)$/u.test(item));
-  const predicate = predicates.at(-1)?.at ?? -1;
-  if (index === predicate) return 'predicate';
-  if (/(?:ly)$/u.test(word) || /(?:게|히)$/u.test(word) || ['very', 'so', 'quite', 'slowly', 'softly', 'quickly', 'gently'].includes(word)) return 'adverb';
-  if (/^(?:작은|큰|고요한|따뜻한|차가운|붉은|푸른|밝은|어두운|깊은|높은|느린|빠른|warm|cold|tiny|small|big|little|quiet|bright|dark|soft|gentle|red|blue|green|golden)$/u.test(word) || /(?:ful|ous|ive|able|less|ish)$/u.test(word)) return 'adjective';
-  if (/(?:을|를)$/u.test(word) || (predicate >= 0 && index > predicate)) return 'object';
-  if (predicate >= 0 && index < predicate) return 'subject';
-  return 'word';
-}
-
-function syntaxSummary(text) {
-  const words = [...text.toLowerCase().matchAll(/[가-힣a-z0-9]+/giu)].map((match) => match[0]);
-  return words.reduce((roles, word, index) => {
-    roles[grammaticalRole(word, index, text)] += 1;
-    return roles;
-  }, { subject: 0, predicate: 0, object: 0, adjective: 0, adverb: 0, word: 0 });
-}
 
 function renderRelations(wordNodes) {
   const svg = elements.relationLines;
-  const rect = elements.sentenceHighlight.getBoundingClientRect();
+  const rect = svg.getBoundingClientRect();
   svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
   svg.replaceChildren();
   if (wordNodes.length < 2) return;
-  const roles = wordNodes.map((node) => node.dataset.role);
-  const predicate = roles.lastIndexOf('predicate');
-  if (predicate < 0) return;
-  const sources = [];
-  const subject = roles.indexOf('subject');
-  const object = roles.indexOf('object');
-  const modifier = roles.findIndex((role) => role === 'adjective' || role === 'adverb');
-  if (subject >= 0 && subject !== predicate) sources.push([subject, predicate]);
-  if (object >= 0 && object !== predicate) sources.push([object, predicate]);
-  if (modifier >= 0) sources.push([modifier, Math.min(modifier + 1, wordNodes.length - 1)]);
+  const sources = analysis.syntax.edges.map(({ from, to }) => [from, to]);
   for (const [from, to] of sources) {
     const a = wordNodes[from].getClientRects()[0] ?? wordNodes[from].getBoundingClientRect();
     const b = wordNodes[to].getClientRects()[0] ?? wordNodes[to].getBoundingClientRect();
@@ -203,8 +179,11 @@ function renderRelations(wordNodes) {
 function analyzeCurrentText({ keepVariation = false } = {}) {
   if (!keepVariation) variation = 0;
   analysis = analyzeText(elements.sentence.value, variation);
-  analysis.syntax = syntaxSummary(elements.sentence.value);
-  code = createStrudelCode(analysis);
+  analysis.syntax = analyzeSyntax(elements.sentence.value);
+  const arrangement = createArrangement(analysis, beat);
+  analysis.bpm = arrangement.bpm;
+  analysis.scale = arrangement.scale;
+  code = createStrudelCode(analysis, beat);
   renderAnalysis();
 }
 
@@ -224,6 +203,7 @@ function stopPlayback(message = '연주를 멈췄어요. 문장을 바꾸거나 
 }
 
 async function applyLatestAudio() {
+  if (!elements.sentence.value.trim()) return;
   if (audioTask) return audioTask;
   const revision = audioRevision;
   let appliedCode = '';
@@ -254,6 +234,7 @@ async function applyLatestAudio() {
 }
 
 async function playCurrent() {
+  if (!elements.sentence.value.trim()) { elements.sentence.focus(); return; }
   if (engine.playing || audioTask) {
     stopPlayback();
     return;
@@ -278,18 +259,28 @@ async function createVariation() {
 }
 
 elements.sentence.addEventListener('focus', () => {
-  if (autoPlayEnabled && !engine.playing && !audioTask) playCurrent();
+  if (elements.sentence.value.trim() && autoPlayEnabled && !engine.playing && !audioTask) playCurrent();
 });
 
-  elements.sentence.addEventListener('input', () => {
+elements.sentence.addEventListener('input', (event) => {
   elements.charCount.textContent = elements.sentence.value.length;
   analyzeCurrentText();
+  if (event.isComposing) return;
+  if (!elements.sentence.value.trim()) {
+    window.clearTimeout(updateTimer);
+    stopPlayback('문장을 입력하세요.');
+    autoPlayEnabled = true;
+    return;
+  }
   if (autoPlayEnabled && !engine.playing && !audioTask) playCurrent();
   window.clearTimeout(updateTimer);
   updateTimer = window.setTimeout(() => {
     if (autoPlayEnabled) applyLatestAudio();
   }, 560);
 });
+
+elements.sentence.addEventListener('compositionstart', () => window.clearTimeout(updateTimer));
+elements.sentence.addEventListener('compositionend', () => elements.sentence.dispatchEvent(new Event('input')));
 
 elements.sentence.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -298,10 +289,15 @@ elements.sentence.addEventListener('keydown', (event) => {
   }
 });
 
+elements.sentence.addEventListener('scroll', () => {
+  elements.sentenceHighlight.scrollTop = elements.sentence.scrollTop;
+  renderRelations([...elements.sentenceHighlight.querySelectorAll('.word-token')]);
+});
+
 elements.playButton.addEventListener('click', playCurrent);
 elements.variationButton.addEventListener('click', createVariation);
 
-document.querySelectorAll('.prompt-chip').forEach((button) => {
+document.querySelectorAll('[data-prompt]').forEach((button) => {
   button.addEventListener('click', () => {
     autoPlayEnabled = true;
     elements.sentence.value = button.dataset.prompt;
@@ -311,6 +307,19 @@ document.querySelectorAll('.prompt-chip').forEach((button) => {
     else playCurrent();
     elements.sentence.focus({ preventScroll: true });
   });
+});
+
+document.querySelector('#beat-mode').addEventListener('change', (event) => {
+  beat.mode = event.target.value;
+  analyzeCurrentText({ keepVariation: true });
+  if (engine.playing) applyLatestAudio();
+});
+document.querySelector('#beat-intensity').addEventListener('input', (event) => {
+  beat.intensity = Number(event.target.value) / 100;
+  document.querySelector('#beat-value').value = `${event.target.value}%`;
+  analyzeCurrentText({ keepVariation: true });
+  window.clearTimeout(updateTimer);
+  updateTimer = window.setTimeout(() => { if (engine.playing) applyLatestAudio(); }, 100);
 });
 
 elements.readingTrigger.addEventListener('click', () => elements.readingDialog.showModal());

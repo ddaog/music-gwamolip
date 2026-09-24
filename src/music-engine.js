@@ -1,103 +1,64 @@
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const ramp = (value) => { const x = clamp(value, 0, 1); return x * x * (3 - 2 * x); };
 
-function take(values, count) {
-  const result = [];
-  for (let index = 0; index < count; index += 1) result.push(values[index % values.length]);
-  return result;
-}
-
-function melodyNotation(analysis) {
-  const notes = take(analysis.layers.nearDegrees, 8);
-  if (analysis.density > 0.72) {
-    notes[2] = `[${notes[2]} ${analysis.degrees[8] ?? '4'}]`;
-    notes[6] = `[${notes[6]} ${analysis.degrees[9] ?? '2'}]`;
-  }
-  return notes.join(' ');
-}
-
-function bassNotation(analysis) {
-  const usable = analysis.layers.farDegrees.filter((degree) => degree !== '~');
-  const first = usable[0] ?? '0';
-  const second = usable[2] ?? '3';
-  const third = usable[4] ?? '4';
-  return `${first} ~ ${first} ~ ${second} ~ ${third} ~`;
-}
-
-export function createStrudelCode(analysis) {
-  const scale = `${analysis.root}4:${analysis.scale}`;
-  const bassScale = `${analysis.root}2:${analysis.scale}`;
-  const melody = melodyNotation(analysis);
-  const bass = bassNotation(analysis);
-  const farNotes = take(analysis.layers.farDegrees, 4).map((degree) => Number(degree) || 0);
-  const pad = farNotes.map((degree) => `[${degree},${degree + 2},${degree + 4}]`).join(' ');
-  const cpm = (analysis.bpm / 4).toFixed(2);
-  const cutoff = Math.round(700 + analysis.axes.light * 2600 + analysis.axes.motion * 500);
-  const room = clamp(0.2 + analysis.axes.space * 0.5, 0.2, 0.72).toFixed(2);
-  const delay = clamp(0.08 + analysis.axes.softness * 0.24, 0.08, 0.34).toFixed(2);
-  const attack = clamp(0.01 + analysis.axes.softness * 0.12, 0.01, 0.14).toFixed(2);
-  const conceptIds = new Set(analysis.concepts.map((concept) => concept.id));
-  const melodySound = conceptIds.has('city') || conceptIds.has('machine')
-    ? 'square'
-    : conceptIds.has('fire') || conceptIds.has('anger')
-      ? 'sawtooth'
-    : analysis.axes.softness > 0.62
-      ? 'sine'
-      : 'triangle';
-  const padSound = analysis.axes.tension > 0.48 ? 'sawtooth' : 'triangle';
-  const sparkleGain = clamp(0.05 + analysis.axes.light * 0.08, 0.05, 0.13).toFixed(2);
-  const hatPattern = analysis.axes.motion > 0.66 ? 'white*8' : 'white ~ white ~';
-  const words = analysis.tokens.length;
-  const syntax = analysis.syntax ?? {};
-  const ramp = (start, span) => {
-    const progress = clamp((words - start) / span, 0, 1);
-    return (progress * progress * (3 - 2 * progress)).toFixed(2);
+// All voices share this four-bar harmony; adding words keeps the motif and key.
+export function createArrangement(analysis, beat = {}) {
+  const count = analysis.tokens.length;
+  const richness = ramp((count - 1) / 10);
+  const anchor = analysis.tokenMeanings[0]?.conceptIds ?? [];
+  const minor = anchor.some((id) => ['moon', 'darkness', 'dream', 'sadness', 'fear'].includes(id));
+  const scale = minor ? 'minor' : 'major';
+  const chords = [0, 5, 3, 4];
+  const contour = [0, 2, 4, 2, 6, 4, 2, 0];
+  const rotation = analysis.seed % 3;
+  const modifiers = analysis.syntax?.edges?.filter((edge) => edge.type === 'modifier').length ?? 0;
+  const active = count < 3 ? [0, 4] : count < 6 ? [0, 2, 4, 6] : [0, 1, 2, 4, 5, 6];
+  const melody = chords.map((root) => contour.map((_, step) => {
+    if (!active.includes(step)) return '~';
+    if (analysis.punctuation > 1 && step === 6) return '~';
+    const tone = contour[(step + rotation * 2) % contour.length];
+    return String(root + tone);
+  }).join(' '));
+  const mode = beat.mode ?? 'auto';
+  const intensity = clamp(beat.intensity ?? 0.55, 0, 1);
+  const drums = mode === 'off' ? 0 : intensity * (mode === 'on' ? 1 : ramp((count - 2) / 8));
+  return {
+    scale, chords, melody, richness, drums,
+    bpm: Math.round(clamp(76 + analysis.axes.motion * 30, 76, 108) / 2) * 2,
+    padGain: 0.012 + richness * 0.06,
+    bassGain: 0.02 + richness * 0.15,
+    melodyGain: 0.13 + richness * 0.05,
+    sparkleGain: richness * (0.012 + Math.min(modifiers, 4) * 0.004),
   };
-  const padGain = (0.025 + Number(ramp(1, 6)) * 0.13 + Math.min(syntax.adjective ?? 0, 3) * 0.008).toFixed(2);
-  const bassGain = (0.035 + Number(ramp(2, 6)) * 0.245 + Math.min(syntax.object ?? 0, 3) * 0.012).toFixed(2);
-  const sparkleGainLayer = (Number(sparkleGain) * Number(ramp(2, 7))).toFixed(2);
-  const rhythmGain = (0.012 + Number(ramp(3, 8)) * 0.055 + Math.min(syntax.adverb ?? 0, 3) * 0.006).toFixed(2);
-  const melodyGain = (0.18 + Number(ramp(1, 8)) * 0.2 + Math.min(syntax.predicate ?? 0, 2) * 0.018).toFixed(2);
+}
 
-  return `setcpm(${cpm})
-
-stack(
-  n("${melody}")
-    .scale("${scale}")
-    .s("${melodySound}")
-    .lpf(${cutoff})
-    .attack(${attack}).decay(.24).sustain(.18).release(.42)
-    .room(${room}).delay(${delay}).delaytime(.25).delayfeedback(.28)
-    .gain(${melodyGain}),
-
-  n("<${pad}>")
-    .scale("${scale}")
-    .s("${padSound}")
-    .lpf(${Math.round(cutoff * 0.46)})
-    .attack(.38).decay(.5).sustain(.36).release(.9)
-    .room(${Math.min(0.8, Number(room) + 0.12).toFixed(2)})
-    .gain(${padGain}),
-
-  n("${bass}")
-    .scale("${bassScale}")
-    .s("sine")
-    .lpf(520).attack(.03).decay(.32).sustain(.08).release(.2)
-    .gain(${bassGain}),
-
-  n("<${take(analysis.layers.nearDegrees, 4).join(' ~ ')} ~>")
-    .scale("${scale}")
-    .s("sine")
-    .attack(.01).decay(.12).sustain(0).release(.18)
-    .room(.68).delay(.22).gain(${sparkleGainLayer}),
-
-  note("${analysis.root}1 ~ ~ ${analysis.root}1")
-    .s("sine")
-    .penv(22).pdecay(.07)
-    .decay(.16).sustain(0).gain(${(0.025 + Number(ramp(4, 8)) * 0.19).toFixed(2)}),
-
-  s("${hatPattern}")
-    .hpf(${Math.round(4700 + analysis.axes.light * 2500)})
-    .decay(.035).sustain(0).room(.12).gain(${rhythmGain})
-)`;
+export function createStrudelCode(analysis, beat = {}) {
+  const arrangement = createArrangement(analysis, beat);
+  const { chords, melody, richness, drums } = arrangement;
+  const scale = analysis.root + '4:' + arrangement.scale;
+  const bassScale = analysis.root + '2:' + arrangement.scale;
+  const padScale = analysis.root + '3:' + arrangement.scale;
+  const alternate = (bars) => '<' + bars.map((bar) => '[' + bar + ']').join(' ') + '>';
+  const cutoff = Math.round(850 + analysis.axes.light * 1500);
+  const room = (0.24 + analysis.axes.space * 0.28).toFixed(2);
+  const attack = (0.025 + analysis.axes.softness * 0.09).toFixed(3);
+  const gain = (value) => value.toFixed(3);
+  const chordPattern = '<' + chords.map((root) => '[' + [root, root + 2, root + 4, root + 6].join(',') + ']').join(' ') + '>';
+  const bass = alternate(chords.map((root) => root + ' ~ ~ ~ ' + root + ' ~ ' + (richness > 0.65 ? root + 4 : '~') + ' ~'));
+  const parts = [
+    'n("' + alternate(melody) + '").scale("' + scale + '").s("triangle").lpf(' + cutoff + ').attack(' + attack + ').decay(.22).sustain(.12).release(.35).room(' + room + ').delay(.12).delaytime(.375).delayfeedback(.22).gain(' + gain(arrangement.melodyGain) + ')',
+    'n("' + chordPattern + '").scale("' + padScale + '").s("triangle").lpf(950).attack(.5).decay(.4).sustain(.28).release(.65).room(' + room + ').gain(' + gain(arrangement.padGain) + ')',
+    'n("' + bass + '").scale("' + bassScale + '").s("sine").lpf(430).attack(.015).decay(.24).sustain(.1).release(.12).gain(' + gain(arrangement.bassGain) + ')',
+    'n("' + alternate(chords.map((root) => '~ ~ ' + (root + 11) + ' ~ ~ ~ ' + (root + 9) + ' ~')) + '").scale("' + scale + '").s("sine").attack(.01).decay(.1).sustain(0).release(.18).room(.4).gain(' + gain(arrangement.sparkleGain) + ')',
+  ];
+  if (drums > 0) {
+    parts.push(
+      'note("c1 ~ ~ ~ c1 ~ ~ ~").s("sine").penv(28).pdecay(.045).attack(.002).decay(.14).sustain(0).release(.035).gain(' + gain(drums * .34) + ')',
+      's("~ ~ white ~ ~ ~ white ~").hpf(1300).lpf(6500).attack(.002).decay(.095).sustain(0).release(.025).room(.08).gain(' + gain(drums * .095) + ')',
+      's("' + (richness > .65 ? 'white*8' : '~ white ~ white ~ white ~ white') + '").hpf(7200).attack(.001).decay(.025).sustain(0).release(.015).gain(' + gain(drums * .038) + ')',
+    );
+  }
+  return 'setcpm(' + (arrangement.bpm / 4).toFixed(2) + ')\n\nstack(\n  ' + parts.join(',\n  ') + '\n)';
 }
 
 export class MusicEngine {
@@ -105,6 +66,7 @@ export class MusicEngine {
     this.ready = false;
     this.initializing = null;
     this.playing = false;
+    this.revision = 0;
     this.module = import('@strudel/web');
   }
 
@@ -121,15 +83,19 @@ export class MusicEngine {
   }
 
   async play(code) {
+    const revision = ++this.revision;
     await this.init();
+    if (revision !== this.revision) return;
     if (typeof globalThis.evaluate !== 'function') {
       throw new Error('Strudel evaluate 함수를 불러오지 못했습니다.');
     }
     await globalThis.evaluate(code);
+    if (revision !== this.revision) { this.stop(); return; }
     this.playing = true;
   }
 
   stop() {
+    this.revision += 1;
     if (typeof globalThis.hush === 'function') globalThis.hush();
     this.playing = false;
   }

@@ -60,6 +60,22 @@
                 </button>
               </div>
               <p class="status-line" id="status-line" aria-live="polite"> </p>
+              <div class="beat-controls">
+                <label for="beat-mode">BEAT</label>
+                <select id="beat-mode" aria-label="비트 모드"><option value="auto">자동</option><option value="on">켜기</option><option value="off">끄기</option></select>
+                <input id="beat-intensity" aria-label="비트 강도" type="range" min="0" max="100" value="55" />
+                <output id="beat-value" for="beat-intensity">55%</output>
+              </div>
+              <details class="play-guide">
+                <summary>이렇게 해보세요</summary>
+                <p>한 단어에서 시작해 문장을 쌓아보세요. 단어가 늘면 화음과 리듬이 더해집니다.</p>
+                <button type="button" data-prompt="달빛">달빛</button>
+                <button type="button" data-prompt="고요한 달빛이 천천히 바다를 비춘다.">고요한 달빛이 천천히 바다를 비춘다.</button>
+                <p>‘고요한’은 부드러운 음색을, ‘빠르게’는 움직임을 더합니다. 쉼표를 넣으면 연결선이 문장 구간을 나누고 음악의 여백이 늘어납니다.</p>
+                <button type="button" data-prompt="A tiny red bird dances softly.">A tiny red bird dances softly.</button>
+                <p>BEAT를 ‘켜기’로 바꾸면 짧은 글에도 리듬이 생깁니다. 슬라이더는 드럼의 강도입니다. ‘자동’에서는 단어 수에 따라 드럼이 쌓입니다.</p>
+                <p>변주로 같은 문장의 다른 선율을 들어보세요. 단어 연결은 한국어·영어 규칙으로 추정하며, 사전에 없는 말은 글자와 발음 특성으로 반응합니다.</p>
+              </details>
               <button id="reading-trigger" class="reading-trigger" type="button" aria-haspopup="dialog" aria-controls="reading-dialog" aria-label="문장 분석 보기">⌁</button>
             </div>
           </div>
