@@ -62,12 +62,13 @@ export function createStrudelCode(analysis, beat = {}) {
 }
 
 export class MusicEngine {
-  constructor() {
+  constructor(loadModule = () => import('@strudel/web')) {
     this.ready = false;
     this.initializing = null;
     this.playing = false;
     this.revision = 0;
-    this.module = import('@strudel/web');
+    this.module = loadModule();
+    this.repl = null;
   }
 
   async init() {
@@ -75,7 +76,8 @@ export class MusicEngine {
     if (!this.initializing) {
       this.initializing = this.module
         .then(({ initStrudel }) => initStrudel())
-        .then(() => {
+        .then((repl) => {
+          this.repl = repl;
           this.ready = true;
         });
     }
@@ -86,17 +88,19 @@ export class MusicEngine {
     const revision = ++this.revision;
     await this.init();
     if (revision !== this.revision) return;
-    if (typeof globalThis.evaluate !== 'function') {
-      throw new Error('Strudel evaluate 함수를 불러오지 못했습니다.');
-    }
-    await globalThis.evaluate(code);
-    if (revision !== this.revision) { this.stop(); return; }
+    // Global hush is replaced by Strudel's evaluation scope with a pattern
+    // reset helper. Keep the actual REPL transport instead of using globals.
+    await this.repl.evaluate(code, false);
+    if (revision !== this.revision) return;
+    if (this.repl.state?.evalError) throw this.repl.state.evalError;
+    if (!this.repl.scheduler.started) await this.repl.start();
+    if (revision !== this.revision) { this.repl.stop(); return; }
     this.playing = true;
   }
 
   stop() {
     this.revision += 1;
-    if (typeof globalThis.hush === 'function') globalThis.hush();
+    this.repl?.stop();
     this.playing = false;
   }
 }

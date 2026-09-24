@@ -64,7 +64,8 @@ function syncEditorLayout() {
   const input = elements.sentence;
   const previousScroll = input.scrollTop;
   input.style.height = '0px';
-  input.style.height = `${Math.min(360, Math.max(156, input.scrollHeight))}px`;
+  const style = getComputedStyle(input);
+  input.style.height = `${Math.min(parseFloat(style.maxHeight), Math.max(parseFloat(style.minHeight), input.scrollHeight))}px`;
   input.style.overflowY = input.scrollHeight > input.clientHeight ? 'auto' : 'hidden';
   input.scrollTop = previousScroll;
   const mirror = elements.sentenceHighlight;
@@ -125,7 +126,7 @@ function renderAnalysis() {
   elements.nearWords.textContent = analysis.layers.nearTokens.join(' · ');
   elements.code.textContent = code;
   renderLiveCode(document.querySelector('#live-code'), elements.sentence.value.trim() ? code : '');
-  document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? '입력 반영 중' : '대기';
+  document.querySelector('#code-state').textContent = elements.sentence.value.trim() ? (autoPlayEnabled ? '입력 반영 중' : '코드 준비됨') : '대기';
   renderWordHighlight();
   visualizer.setAnalysis(analysis);
 }
@@ -133,7 +134,7 @@ function renderAnalysis() {
 function renderWordHighlight() {
   const host = elements.sentenceHighlight;
   const text = elements.sentence.value;
-  const tokenRegex = /[가-힣a-z0-9]+/giu;
+  const tokenRegex = /[가-힣ㄱ-ㅎㅏ-ㅣ\u1100-\u11ffa-z0-9]+/giu;
   const tokens = new Map(analysis.tokenMeanings.map((meaning) => [meaning.token, meaning]));
   host.replaceChildren();
   let cursor = 0;
@@ -143,7 +144,9 @@ function renderWordHighlight() {
     if (start > cursor) host.append(document.createTextNode(text.slice(cursor, start)));
     const word = document.createElement('span');
     const rawToken = match[0].toLowerCase();
-    const meaning = tokens.get(rawToken) ?? { token: rawToken, primaryConcept: 'unique', layer: 'near', traits: {} };
+    // Keep the last committed word's visual identity while the IME builds syllables.
+    const committed = composing ? analysis.tokenMeanings[tokenIndex] : null;
+    const meaning = tokens.get(rawToken) ?? committed ?? { token: rawToken, primaryConcept: 'unique', layer: 'near', traits: {} };
     const profile = visualProfileForToken(meaning?.primaryConcept, meaning?.token ?? match[0], meaning?.traits);
     word.className = 'word-token';
     word.dataset.effect = profile.effect;
@@ -175,7 +178,7 @@ function renderRelations(wordNodes) {
   svg.replaceChildren();
   if (wordNodes.length < 2) return;
   const sources = analysis.syntax.edges;
-  for (const { from, to, provisional } of sources) {
+  for (const { from, to, provisional, type } of sources) {
     if (!wordNodes[from]?.isConnected || !wordNodes[to]?.isConnected) continue;
     const a = wordNodes[from].getClientRects()[0] ?? wordNodes[from].getBoundingClientRect();
     const b = wordNodes[to].getClientRects()[0] ?? wordNodes[to].getBoundingClientRect();
@@ -187,7 +190,12 @@ function renderRelations(wordNodes) {
     const lift = Math.max(8, Math.min(y1, y2) - Math.min(18, 7 + distance * .035));
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${lift} ${x2} ${y2}`);
+    if (type === 'shared-subject' && Math.abs(y2 - y1) > 20) {
+      const bend = Math.max(8, Math.min(x1, x2) - 24 - (to % 3) * 7);
+      path.setAttribute('d', `M ${x1} ${y1} C ${bend} ${y1}, ${bend} ${y2}, ${x2} ${y2}`);
+    }
     path.setAttribute('class', 'relation-path');
+    if (type === 'shared-subject') path.classList.add('is-shared');
     if (provisional) path.classList.add('is-provisional');
     svg.append(path);
     for (const [x, y] of [[x1, y1], [x2, y2]]) {
@@ -220,6 +228,7 @@ function updatePlaybackStatus() {
 }
 
 function stopPlayback(message = '연주를 멈췄어요. 문장을 바꾸거나 다시 시작해보세요.') {
+  window.clearTimeout(updateTimer);
   autoPlayEnabled = false;
   audioRevision += 1;
   engine.stop();
@@ -269,10 +278,9 @@ async function playCurrent() {
   autoPlayEnabled = true;
   audioRevision += 1;
   analyzeCurrentText({ keepVariation: true });
-  elements.playButton.disabled = true;
+  elements.actionLabel.textContent = '소리 멈추기';
   elements.status.textContent = '문장의 첫 소리를 찾고 있어요…';
   await applyLatestAudio();
-  elements.playButton.disabled = false;
 }
 
 async function createVariation() {
@@ -290,7 +298,7 @@ elements.sentence.addEventListener('focus', () => {
 
 elements.sentence.addEventListener('input', (event) => {
   elements.charCount.textContent = elements.sentence.value.length;
-  if (event.isComposing || composing) { syncEditorLayout(); return; }
+  if (event.isComposing || composing) { renderWordHighlight(); return; }
   analyzeCurrentText();
   if (!elements.sentence.value.trim()) {
     window.clearTimeout(updateTimer);
@@ -384,6 +392,17 @@ new ResizeObserver(([entry]) => {
   scheduleRelations();
 }).observe(elements.sentence.parentElement);
 document.fonts.ready.then(() => { syncEditorLayout(); scheduleRelations(); });
+
+// Use the visible viewport, including the space left above a mobile keyboard.
+function syncViewport() {
+  const height = window.visualViewport?.height ?? window.innerHeight;
+  document.documentElement.classList.toggle('compact-viewport', height < 540);
+  syncEditorLayout();
+  scheduleRelations();
+}
+window.visualViewport?.addEventListener('resize', syncViewport);
+window.addEventListener('resize', syncViewport);
+syncViewport();
 
 window.addEventListener('pagehide', () => engine.stop());
 

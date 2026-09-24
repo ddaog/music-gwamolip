@@ -1,6 +1,6 @@
 let previous = [];
 export function renderLiveCode(host, source) {
-  const lines = source ? source.replace(/\)\./g, ')\n    .').split('\n') : ['// 한 문장이 음악이 되는 과정'];
+  const lines = source ? source.replace(/stack\(\s*\n\s*/u, 'stack(').replace(/\n\s*\n/gu, '\n').replace(/\)\./g, ')\n    .').split('\n') : ['// 한 문장이 음악이 되는 과정'];
   const fragment = document.createDocumentFragment();
   lines.forEach((line, index) => {
     const row = document.createElement('span');

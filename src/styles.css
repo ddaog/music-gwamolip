@@ -1278,9 +1278,64 @@ footer { color: #85898a; }
 .live-code-footer { padding-top:9px; padding-bottom:9px; border-top:1px solid #dce0d8; font-size:8px; }
 @media (prefers-reduced-motion:reduce) { .code-line.is-updated { animation:none; } }
 @media (max-width:560px) { .visual-panel #visualizer { min-height:570px; flex-basis:570px; } }
-.text-field-wrap.is-composing #sentence { color: var(--text); -webkit-text-fill-color: var(--text); }
-.text-field-wrap.is-composing #sentence-highlight,
-.text-field-wrap.is-composing #relation-lines { visibility: hidden; }
 @media (max-width: 560px) {
   .composer #sentence, .composer #sentence-highlight { padding: 30px 18px 26px; font-size: 22px; }
+}
+
+/* One instrument: text above, code and motion in one shared field of view. */
+.site-header { min-height: 54px; }
+.hero-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; max-width:1000px; margin:0 auto; }
+.copy-panel { grid-column:1 / -1; padding:24px 0 0; }
+.composer { width:100%; display:grid; grid-template-columns:1fr auto; gap:10px; }
+.composer .text-field-wrap { grid-column:1 / -1; }
+.composer #sentence, .composer #sentence-highlight { padding:18px 20px 22px; font-size:clamp(22px,2.8vw,32px); }
+.composer #sentence { min-height:100px; max-height:180px; }
+.composer .action-row { flex-direction:row; justify-content:flex-start; margin:0; }
+.composer .action-row button { width:auto; }
+.instrument-settings { align-self:center; font-size:10px; color:var(--muted); }
+.instrument-settings > summary { cursor:pointer; padding:10px 0; text-align:right; }
+.instrument-settings[open] { grid-column:1 / -1; }
+.instrument-settings .reading-trigger { position:static; display:block; margin:8px auto; }
+.instrument-settings .prompt-row { margin:4px 0; }
+.instrument-settings .beat-controls { margin-top:8px; }
+.relation-path { animation:none; }
+.relation-path.is-shared { stroke:#84948d; stroke-width:1; }
+.live-code-panel { width:100%; margin:0; min-width:0; align-self:stretch; display:flex; flex-direction:column; }
+.live-code-panel .live-code-scroll { height:274px; max-height:none; flex:1 1 0; min-height:0; }
+.live-code-heading { padding:10px 12px; min-height:34px; }
+.live-code-heading i { margin:0 4px; }
+.live-code-footer { padding:8px 12px; }
+.visual-panel { width:100%; min-width:0; min-height:0; margin:0; padding:0; }
+.visual-heading { min-height:32px; padding:0 8px; }
+.visual-heading strong { font-size:12px; }
+.cycle-readout { display:flex; align-items:center; gap:8px; }
+.visual-panel #visualizer { height:266px; min-height:266px; flex:0 0 266px; }
+.visual-caption { min-height:34px; gap:20px; padding:0; }
+.visual-caption .micro-dial__knob { display:none; }
+footer { min-height:28px; }
+@media (max-width:600px) {
+  .page-shell { padding-inline:12px; }
+  .site-header { min-height:42px; }
+  .hero-grid { grid-template-columns:minmax(0,1fr); gap:10px; }
+  .copy-panel { padding-top:12px; }
+  .composer { gap:8px; }
+  .composer #sentence, .composer #sentence-highlight { font-size:22px; padding:14px 14px 20px; }
+  .composer #sentence { min-height:96px; max-height:150px; }
+  .live-code-panel .live-code-scroll { flex:none; height:84px; padding:6px 0; font-size:10px; }
+  .live-code-footer { display:none; }
+  .visual-panel #visualizer { height:212px; min-height:212px; flex-basis:212px; }
+  .visual-caption { min-height:26px; }
+}
+@media (max-width:600px) {
+  .compact-viewport .site-header, .compact-viewport footer, .compact-viewport .visual-caption { display:none; }
+  .compact-viewport .copy-panel { padding-top:6px; }
+  .compact-viewport .hero-grid { gap:6px; }
+  .compact-viewport .composer #sentence { min-height:64px; max-height:96px; }
+  .compact-viewport .composer #sentence, .compact-viewport .composer #sentence-highlight { font-size:20px; padding:8px 12px 16px; }
+  .compact-viewport .primary-action, .compact-viewport .secondary-action { min-height:28px; }
+  .compact-viewport .instrument-settings > summary { padding:6px 0; }
+  .compact-viewport .live-code-panel .live-code-scroll { height:44px; }
+  .compact-viewport .live-code-heading { min-height:26px; padding:6px 10px; }
+  .compact-viewport .visual-heading { min-height:24px; }
+  .compact-viewport .visual-panel #visualizer { height:142px; min-height:142px; flex-basis:142px; }
 }

@@ -237,8 +237,9 @@ export class Visualizer {
   drawOrbit(time, cycle) {
     const { context: ctx, width, height, analysis } = this;
     const centerX = width / 2;
-    const baseRadius = Math.min(width * 0.19, height * 0.29);
-    const centerY = baseRadius + 16;
+    const graphHeight = height < 180 ? 58 : height < 300 ? 78 : 110;
+    const baseRadius = Math.max(20, Math.min(width * 0.19, (height - graphHeight - 28) / 2));
+    const centerY = baseRadius + 8;
     ctx.save();
     ctx.strokeStyle = COLORS.grid;
     ctx.lineWidth = 1;
@@ -419,10 +420,10 @@ export class Visualizer {
       this.graphAxes[axis] += (analysis.axes[axis] - this.graphAxes[axis]) * (this.reducedMotion ? 1 : .08);
     }
     const axes = this.graphAxes;
-    const stacked = width < 480;
-    const margin = 12, gap = 16, panelHeight = 144;
+    const stacked = false;
+    const margin = 4, gap = 10, panelHeight = height < 180 ? 58 : height < 300 ? 78 : 110;
     const panelWidth = stacked ? width - margin * 2 : (width - margin * 2 - gap) / 2;
-    const top = height - (stacked ? panelHeight * 2 + gap : panelHeight) - 12;
+    const top = height - panelHeight - 4;
     for (let panel = 0; panel < 2; panel += 1) {
       const x = margin + (stacked ? 0 : panel * (panelWidth + gap));
       const y = top + (stacked ? panel * (panelHeight + gap) : 0);
@@ -430,8 +431,8 @@ export class Visualizer {
       const gains = panel
         ? [.15 + axes.tension * .15, .35 + axes.motion * .28, .4 + axes.light * .3]
         : [.5 + axes.warmth * .25, .23 + axes.space * .25, .1 + axes.light * .16];
-      const left = x + 18, right = x + panelWidth - 18;
-      const plotTop = y + 42, bottom = y + panelHeight - 26;
+      const left = x + 10, right = x + panelWidth - 10;
+      const plotTop = y + 26, bottom = y + panelHeight - 16;
       const response = (t) => clamp(gains.reduce((sum, value, i) => {
         const distance = (t - [.13, .5, .87][i]) / .22;
         return sum + value * Math.exp(-.5 * distance * distance);
@@ -442,17 +443,17 @@ export class Visualizer {
       ctx.fillStyle = '#eff1ed'; ctx.fill();
       ctx.strokeStyle = '#d0d5ce'; ctx.lineWidth = .8; ctx.stroke();
       ctx.textAlign = 'left';
-      ctx.font = '500 11px ui-monospace, monospace';
+      ctx.font = '500 9px ui-monospace, monospace';
       ctx.fillStyle = ink;
-      ctx.fillText(panel ? '근경 / MELODY' : '원경 / BASS', left, y + 24);
+      ctx.fillText(panel ? '근경 / MELODY' : '원경 / BASS', left, y + 16);
       ctx.textAlign = 'right'; ctx.font = '8px ui-monospace, monospace';
-      ctx.fillStyle = '#929b92'; ctx.fillText('TONE', right, y + 24);
+      ctx.fillStyle = '#929b92'; if (panelWidth > 220) ctx.fillText('TONE', right, y + 16);
       for (let i = 0; i < 3; i += 1) {
         const px = left + (right - left) * (i / 2);
         ctx.strokeStyle = '#dde2d9'; ctx.lineWidth = .7;
         ctx.beginPath(); ctx.moveTo(px, plotTop); ctx.lineTo(px, bottom); ctx.stroke();
         ctx.textAlign = i === 0 ? 'left' : i === 2 ? 'right' : 'center';
-        ctx.fillStyle = '#9aa296'; ctx.fillText(['LOW', 'MID', 'AIR'][i], px, bottom + 15);
+        ctx.fillStyle = '#9aa296'; ctx.fillText(['LOW', 'MID', 'AIR'][i], px, bottom + 11);
       }
       const points = Array.from({ length: 65 }, (_, i) => [
         left + (right - left) * i / 64,

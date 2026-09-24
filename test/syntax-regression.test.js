@@ -2,7 +2,22 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { analyzeSyntax } from '../src/syntax.js';
 
+test('repeated subjects branch to poetic complements without merging different subjects', () => {
+  const parsed = analyzeSyntax('나는 이렇게 산단다.\n너는 기쁨\n너는 사랑\n너는 우물가의 물.');
+  const branches = parsed.edges.filter((edge) => edge.type === 'shared-subject');
+  assert.deepEqual(branches.map(({ from, to }) => [from, parsed.words[to].token]), [[3, '사랑'], [3, '물']]);
+  assert.ok(branches.every((edge) => edge.provisional));
+  assert.equal(analyzeSyntax('나는 노래한다. 너는 춤춘다.').edges.filter((edge) => edge.type === 'shared-subject').length, 0);
+});
+
+test('repeated English subjects share their predicate branches', () => {
+  const parsed = analyzeSyntax('You sing. You dance.');
+  assert.ok(parsed.edges.some((edge) => edge.type === 'shared-subject' && edge.from === 0 && parsed.words[edge.to].token === 'dance'));
+});
+
 const cases = [
+  ['너는 늘\n나에게\n기쁨을 주지', ['너는→주지', '나에게→주지', '기쁨을→주지']],
+  ['You\ngive me\njoy', ['you→give', 'joy→give']],
   ['나는 너를 좋아해', ['나는→좋아해', '너를→좋아해']],
   ['나는 음악을 듣고 너는 그림을 그린다.', ['나는→듣고', '음악을→듣고', '너는→그린다', '그림을→그린다']],
   ['새가 날아가고 바람이 분다.', ['새가→날아가고', '바람이→분다']],

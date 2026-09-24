@@ -36,7 +36,8 @@ function roleFor(token) {
   if (/[을를]$/u.test(token)) return 'object';
   if (koVerbStem.test(token) && /(?:는|던|진|친|린|춘|본)$/u.test(token)) return 'participle';
   if (/(?:다|어요|아요|해요|했어|었어|았어|할게|네요|습니다|습니까|죠)$/u.test(token)
-    || (koVerbStem.test(token) && /(?:고|며|면서|지만|어|아|해|줘|돼|봐|자)$/u.test(token))) return 'predicate';
+    || /^(?:주|받|주었|받았)(?:지|고|며|어|아)$/u.test(token)
+    || (koVerbStem.test(token) && /(?:고|며|면서|지만|어|아|해|줘|돼|봐|자|지)$/u.test(token))) return 'predicate';
   if (/[은는이가]$/u.test(token)) return 'subject';
   return 'word';
 }
@@ -45,12 +46,15 @@ export function analyzeSyntax(text) {
   let clause = 0;
   let sentence = 0;
   let previousEnd = 0;
+  let previousRole = '';
   const words = [...text.matchAll(/[가-힣a-z0-9]+/giu)].map((match, index) => {
     const gap = text.slice(previousEnd, match.index);
-    if (/[,.!?;\n]/u.test(gap)) clause += 1;
-    if (/[.!?\n]/u.test(gap)) sentence += 1;
     const token = match[0].toLowerCase();
     const role = roleFor(token);
+    const lineBoundary = /\n/u.test(gap) && (role === 'subject' || previousRole === 'predicate');
+    if (/[,.!?;]/u.test(gap) || lineBoundary) clause += 1;
+    if (/[.!?]/u.test(gap) || lineBoundary) sentence += 1;
+    previousRole = role;
     previousEnd = match.index + match[0].length;
     const word = { token, index, clause, sentence, role };
     if (role === 'predicate' && /[가-힣]/u.test(token) && /(?:고|며|면서|지만)$/u.test(token)) clause += 1;
@@ -115,6 +119,20 @@ export function analyzeSyntax(text) {
   for (let i = 1; i < predicates.length; i += 1) {
     const a = predicates[i - 1], b = predicates[i];
     if (a.sentence === b.sentence && a.clause !== b.clause) add(a.index, b.index, 'continuation');
+  }
+  // Repeated explicit subjects form a hub; never merge different pronouns or infer omitted subjects.
+  const subjectHubs = new Map();
+  for (const word of words) {
+    const subjectEdge = edges.find((edge) => edge.from === word.index && edge.type === 'subject');
+    if (word.role !== 'subject' && !subjectEdge) continue;
+    const key = /^[가-힣]+$/u.test(word.token) ? word.token.replace(/[은는이가]$/u, '') : word.token;
+    if (!key) continue;
+    const hub = subjectHubs.get(key);
+    if (!hub) { subjectHubs.set(key, word); continue; }
+    if (hub.clause === word.clause) continue;
+    const local = words.filter((other) => other.clause === word.clause && other.index > word.index);
+    const target = subjectEdge ? words[subjectEdge.to] : local.filter((other) => nounRoles.includes(other.role)).at(-1);
+    if (target) add(hub.index, target.index, 'shared-subject', !subjectEdge);
   }
   const counts = words.reduce((result, word) => ({ ...result, [word.role]: (result[word.role] ?? 0) + 1 }), {});
   return { words, edges, ...counts };
