@@ -16,6 +16,14 @@ test('repeated English subjects share their predicate branches', () => {
 });
 
 const cases = [
+  ['너는 정말 예뻐', ['너는→예뻐', '정말→예뻐']],
+  ['나의 작은 고양이가 창밖을 바라본다', ['나의→고양이가', '작은→고양이가', '고양이가→바라본다']],
+  ['너는 나의 기쁨이야', ['너는→기쁨이야', '나의→기쁨이야']],
+  ['나는 너를 보고 싶어', ['나는→보고', '너를→보고', '나는→싶어']],
+  ['나는 음악을 들으며 그림을 그려', ['나는→들으며', '나는→그려', '음악을→들으며', '그림을→그려']],
+  ['아이들이 공원에서도 신나게 뛰었어요', ['아이들이→뛰었어요', '공원에서도→뛰었어요', '신나게→뛰었어요']],
+  ['나도 바다를 보고\n함께 노래해', ['나도→보고', '나도→노래해']],
+  ['노래하는 새를 나는 바라본다', ['노래하는→새를', '나는→바라본다', '새를→바라본다']],
   ['안녕? 나는 너를 보고\n무슨 생각을 했게?', ['나는→보고', '나는→했게', '생각을→했게']],
   ['너는 늘 나를 보고 좋은 생각이 난다고 했는데.', ['너는→보고', '생각이→난다고', '너는→했는데', '좋은→생각이']],
   ['나는 음악을 듣고 춤을 춘다.', ['나는→듣고', '나는→춘다']],
@@ -54,4 +62,13 @@ test('inherited subjects stop at a different subject or sentence boundary', () =
   }
   const parsed = analyzeSyntax('너는 늘 나를 보고 좋은 생각이 난다고 했는데.');
   assert.ok(!parsed.edges.some(({ from, to }) => parsed.words[from].token === '너는' && parsed.words[to].token === '난다고'));
+});
+
+test('Korean endings distinguish noun exceptions, particles and conversational predicates', () => {
+  const roles = (text) => analyzeSyntax(text).words.map((word) => word.role);
+  assert.deepEqual(roles('바다 사과 고양이 나비 이야기 사진 라디오'), Array(7).fill('word'));
+  assert.deepEqual(roles('공원에서도 너에게만 집에서는'), Array(3).fill('place'));
+  assert.deepEqual(roles('예뻐 그려 들으며 싶어 기쁨이야 반가워'), Array(6).fill('predicate'));
+  const parsed = analyzeSyntax('나의 작은 고양이가 창밖을 바라본다');
+  assert.ok(!parsed.edges.some(({ from, to }) => parsed.words[from].token === '나의' && parsed.words[to].token === '바라본다'));
 });

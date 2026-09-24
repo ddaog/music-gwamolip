@@ -1,4 +1,5 @@
 // Local, bounded linguistic heuristics. Provisional edges are explicitly marked.
+import { koreanRole } from './korean-grammar.js';
 const set = (text) => new Set(text.split(' '));
 const verbs = set('be have do feel love like see hear hold dance shine flow run walk sing breathe fall rise glow drift touch wait move open close eat watch listen read write draw play make take give go come look speak think know want sleep sit stand fly cross grow carry stop swim help smile laugh work live leave meet dream drink learn follow remember turn bring');
 const irregular = { is:'be', are:'be', am:'be', was:'be', were:'be', been:'be', has:'have', had:'have', does:'do', did:'do', done:'do', went:'go', gone:'go', saw:'see', seen:'see', ate:'eat', eaten:'eat', ran:'run', sang:'sing', sung:'sing', flew:'fly', flown:'fly', drew:'draw', drawn:'draw', wrote:'write', written:'write', made:'make', took:'take', taken:'take', held:'hold', felt:'feel', came:'come', heard:'hear', slept:'sleep', thought:'think', brought:'bring', left:'leave' };
@@ -19,6 +20,8 @@ function englishVerb(word) {
   return forms.some((form) => verbs.has(form));
 }
 function roleFor(token) {
+  const korean = koreanRole(token);
+  if (korean) return korean;
   if (/^(?:좋은|무슨|어떤)$/u.test(token)) return 'adjective';
   if (/^(?:늘|항상|이렇게|그렇게|저렇게)$/u.test(token)) return 'adverb';
   // Conversational endings must be checked before -게 (adverb) / -에 (place).
@@ -59,7 +62,7 @@ export function analyzeSyntax(text) {
     const lineBoundary = /\n/u.test(gap) && (role === 'subject' || previousRole === 'predicate');
     if (/[,.!?;]/u.test(gap) || lineBoundary) clause += 1;
     if (/[.!?]/u.test(gap) || lineBoundary) sentence += 1;
-    const continues = role === 'predicate' && /(?:고|며|면서|지만|는데)$/u.test(token);
+    const continues = role === 'predicate' && /(?:고|며|면서|지만|는데|어서|아서|면)$/u.test(token);
     previousRole = continues ? 'connective' : role;
     previousEnd = match.index + match[0].length;
     const word = { token, index, clause, sentence, role };
@@ -87,8 +90,9 @@ export function analyzeSyntax(text) {
     const nearest = (word, items) => [...items].sort((a, b) => Math.abs(a.index - word.index) - Math.abs(b.index - word.index))[0];
     for (const word of group) {
       const predicate = nearest(word, heads);
-      if (['adjective', 'participle', 'determiner'].includes(word.role)) {
-        const noun = group.find((other) => other.index > word.index && nounRoles.includes(other.role));
+      if (['adjective', 'participle', 'determiner', 'possessive'].includes(word.role)) {
+        const noun = group.find((other) => other.index > word.index && (nounRoles.includes(other.role)
+          || (word.role === 'possessive' && /(?:이야|이에요|예요|입니다)$/u.test(other.token))));
         if (noun) add(word.index, noun.index, word.role === 'determiner' ? 'determiner' : 'modifier');
         if (word.role === 'participle') {
           const subject = [...group].reverse().find((other) => other.index < word.index && other.role === 'subject');

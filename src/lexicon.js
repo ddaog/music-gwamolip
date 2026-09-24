@@ -1,4 +1,5 @@
 // A deliberately local, human-readable bilingual image lexicon.
+import { KOREAN_VOCABULARY } from './korean-vocabulary.js';
 // Korean entries are mostly stems so particles and common conjugations still match.
 const words = (ko, en) => ({
   ko: ko.trim().split(/\s+/u),
@@ -135,6 +136,10 @@ export const CONCEPTS = [
     '만나 만남 함께 서로 곁 손잡 손을잡 기다려 안녕 인사 대화 이야기 나누 연결 이어지 헤어지 약속 동행 사이 마주보다 바라보다',
     'meet meeting together each other beside hold hands hello greet greeting conversation talk share connect connection join parting goodbye promise accompany relationship between face'),
 ];
+
+for (const entry of CONCEPTS) {
+  entry.words.ko = [...new Set([...entry.words.ko, ...(KOREAN_VOCABULARY[entry.id] ?? '').split(/\s+/u).filter(Boolean)])];
+}
 
 export const FAR_CUES = `
   먼 멀리 저편 너머 뒤 배경 바깥 위 아래 하늘 수평선 지평선 풍경 산맥 들판

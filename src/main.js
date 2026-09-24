@@ -1,4 +1,5 @@
 import './styles.css';
+import { editorFontSize } from './editor-layout.js';
 import { analyzeSyntax } from './syntax.js';
 import { renderLiveCode } from './live-code.js';
 import { analyzeText, describeAnalysis } from './text-analyzer.js';
@@ -62,6 +63,8 @@ let composing = false;
 
 function syncEditorLayout() {
   const input = elements.sentence;
+  const compact = document.documentElement.classList.contains('compact-viewport');
+  input.parentElement.style.setProperty('--editor-font-size', `${editorFontSize(input.value, window.innerWidth, compact)}px`);
   const previousScroll = input.scrollTop;
   input.style.height = '0px';
   const style = getComputedStyle(input);
@@ -365,6 +368,10 @@ document.querySelector('#beat-intensity').addEventListener('input', (event) => {
 });
 
 elements.readingTrigger.addEventListener('click', () => elements.readingDialog.showModal());
+document.querySelector('#code-details').addEventListener('click', () => {
+  elements.readingDialog.showModal();
+  elements.code.scrollIntoView({ block: 'center' });
+});
 elements.readingClose.addEventListener('click', () => elements.readingDialog.close());
 elements.readingDialog.addEventListener('click', (event) => {
   if (event.target === elements.readingDialog) elements.readingDialog.close();

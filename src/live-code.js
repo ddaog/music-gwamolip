@@ -1,6 +1,24 @@
 let previous = [];
+export function codeLayers(source) {
+  return source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line)).map((line) => {
+    const label = line.includes('.penv(') ? 'KICK' : line.includes('.hpf(7200)') ? 'HI-HAT'
+      : line.includes('.hpf(') ? 'SNARE' : /2:(?:major|minor)/u.test(line) ? 'BASS'
+      : /3:(?:major|minor)/u.test(line) ? 'CHORDS' : line.includes('.s("sine")') ? 'SPARKLE' : 'MELODY';
+    const sound = line.match(/\.s\("([a-z]+)"\)/u)?.[1] ?? 'noise';
+    return `${label}  →  ${sound}`;
+  });
+}
+export function visiblePatternCode(source) {
+  const patterns = source.split('\n').filter((line) => /^\s+(?:n|note|s)\(/u.test(line))
+    .map((line) => line.match(/^\s*((?:n|note|s)\("[^"\n]*"\))/u)?.[1]).filter(Boolean);
+  return patterns.length ? ['stack(', ...patterns.map((pattern, index) => `  ${pattern}${index < patterns.length - 1 ? ',' : ''}`), ')'] : ['// 첫 단어를 기다리는 중'];
+}
 export function renderLiveCode(host, source) {
-  const lines = source ? source.replace(/stack\(\s*\n\s*/u, 'stack(').replace(/\n\s*\n/gu, '\n').replace(/\)\./g, ')\n    .').split('\n') : ['// 한 문장이 음악이 되는 과정'];
+  const layers = codeLayers(source);
+  const lines = visiblePatternCode(source);
+  host.closest('.live-code-panel')?.style.setProperty('--pattern-rows', lines.length);
+  const count = document.querySelector('#layer-count');
+  if (count) count.textContent = `${layers.length} LAYERS`;
   const fragment = document.createDocumentFragment();
   lines.forEach((line, index) => {
     const row = document.createElement('span');

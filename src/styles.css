@@ -1339,3 +1339,20 @@ footer { min-height:28px; }
   .compact-viewport .visual-heading { min-height:24px; }
   .compact-viewport .visual-panel #visualizer { height:142px; min-height:142px; flex-basis:142px; }
 }
+
+/* One shared size keeps caret, colored mirror, and relationship anchors aligned. */
+.composer #sentence, .composer #sentence-highlight,
+.compact-viewport .composer #sentence, .compact-viewport .composer #sentence-highlight {
+  font-size:var(--editor-font-size, 22px);
+}
+
+#code-details { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:4px; font:inherit; }
+#live-code { display:block; }
+#live-code .code-line { width:max-content; min-width:100%; padding:0 8px 0 28px; font-size:10px; }
+#live-code .code-line::before { left:8px; }
+@media (max-width:600px) {
+  #live-code { gap:1px 0; }
+  #live-code .code-line { padding-block:0; font-size:9px; }
+  .live-code-panel .live-code-scroll { height:min(174px, calc(var(--pattern-rows, 1) * 18px + 12px)); }
+  .compact-viewport .live-code-panel .live-code-scroll { height:66px; }
+}
